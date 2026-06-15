@@ -525,12 +525,13 @@
                   <textarea id="liveTranscript" placeholder="Use the free browser listener to capture your mic, or paste transcript text here."></textarea>
                 </div>
                 <div class="actions" style="margin-top:16px">
+                  <button class="btn primary" id="shareTabBtn">Share Tab Audio</button>
                   <button class="btn primary" id="listenBtn">Start Listener</button>
                   <button class="btn" id="stopListenBtn">Stop Listener</button>
                   <button class="btn" id="summarizeTextBtn">Summarize Text</button>
                 </div>
                 <div class="live-chip idle" id="listenChip"><span class="dot"></span><span id="listenChipText">Idle</span></div>
-                <div class="helper" id="listenStatus">Free browser listener is idle. Chrome works best for live speech recognition.</div>
+                <div class="helper" id="listenStatus">Free browser listener is idle. Chrome works best for live speech recognition. For computer audio, use Share Tab Audio and select the YouTube tab with audio sharing enabled.</div>
               </div>
             </div>
             <div class="output-card">
@@ -612,9 +613,14 @@
     const listenStatus = document.getElementById('listenStatus');
     const listenChip = document.getElementById('listenChip');
     const listenChipText = document.getElementById('listenChipText');
+    const shareTabBtn = document.getElementById('shareTabBtn');
     let jsonMode = false;
     let recognition = null;
     let listening = false;
+    let tabStream = null;
+    let tabRecorder = null;
+    let tabChunks = [];
+    let tabSharing = false;
 
     function parseVideoId(input) {
       if (!input) return null;
@@ -679,6 +685,16 @@
     function setListeningUi(active, text) {
       listenChip.classList.toggle('idle', !active);
       listenChipText.textContent = text;
+    }
+
+    function finalizeCapturedText(text) {
+      const cleaned = String(text || '').trim();
+      if (!cleaned) return;
+      liveTranscript.value = `${liveTranscript.value}${liveTranscript.value.trim() ? ' ' : ''}${cleaned}`;
+      const summary = summarizeText(liveTranscript.value.trim());
+      const sentences = liveTranscript.value.trim().split(/(?<=[.!?])\s+/).filter(Boolean);
+      const highlights = sentences.slice(0, 5).map((line) => `• ${line}`).join('\n');
+      out.textContent = `${summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${liveTranscript.value.trim().length} characters`;
     }
 
     function loadPlayer() {
@@ -769,10 +785,78 @@
       setListeningUi(false, 'Idle');
       const text = liveTranscript.value.trim();
       if (text) {
-        const summary = summarizeText(text);
-        const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
-        const highlights = sentences.slice(0, 5).map((line) => `• ${line}`).join('\n');
-        out.textContent = `${summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${text.length} characters`;
+        finalizeCapturedText(text);
+      }
+    }
+
+    async function shareTabAudio() {
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        listenStatus.textContent = 'Tab audio capture is not supported in this browser.';
+        return;
+      }
+
+      if (typeof MediaRecorder === 'undefined') {
+        listenStatus.textContent = 'This browser cannot record shared tab audio.';
+        return;
+      }
+
+      try {
+        tabSharing = true;
+        shareTabBtn.textContent = 'Sharing...';
+        listenStatus.textContent = 'Pick the YouTube tab and enable audio sharing.';
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        tabStream = stream;
+
+        const audioTracks = stream.getAudioTracks();
+        if (!audioTracks.length) {
+          throw new Error('No audio track was shared. Make sure tab audio is enabled.');
+        }
+
+        const audioStream = new MediaStream(audioTracks);
+        tabChunks = [];
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+        tabRecorder = new MediaRecorder(audioStream, { mimeType });
+
+        tabRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            tabChunks.push(event.data);
+          }
+        };
+
+        tabRecorder.onstop = () => {
+          const blob = new Blob(tabChunks, { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.play().catch(() => {});
+          listenStatus.textContent = 'Shared tab audio captured. You can now use the free mic listener or paste notes from the audio.';
+          tabSharing = false;
+          shareTabBtn.textContent = 'Share Tab Audio';
+          tabStream?.getTracks().forEach((track) => track.stop());
+          tabStream = null;
+          tabRecorder = null;
+          tabChunks = [];
+          URL.revokeObjectURL(url);
+        };
+
+        tabRecorder.start();
+        listenStatus.textContent = 'Recording shared tab audio. Stop sharing to finish capture.';
+        tabStream.getVideoTracks().forEach((track) => {
+          track.onended = () => {
+            if (tabRecorder && tabRecorder.state !== 'inactive') {
+              tabRecorder.stop();
+            }
+          };
+        });
+      } catch (error) {
+        tabSharing = false;
+        shareTabBtn.textContent = 'Share Tab Audio';
+        listenStatus.textContent = error.message || 'Could not start tab audio capture.';
+        if (tabStream) {
+          tabStream.getTracks().forEach((track) => track.stop());
+          tabStream = null;
+        }
+        tabRecorder = null;
+        tabChunks = [];
       }
     }
 
@@ -797,6 +881,13 @@
       }
     });
     document.getElementById('stopListenBtn').addEventListener('click', stopListener);
+    shareTabBtn.addEventListener('click', () => {
+      if (tabSharing && tabRecorder && tabRecorder.state !== 'inactive') {
+        tabRecorder.stop();
+      } else {
+        shareTabAudio();
+      }
+    });
     document.getElementById('loadPlayerBtn').addEventListener('click', loadPlayer);
     document.getElementById('clearPlayerBtn').addEventListener('click', clearPlayer);
     let playerDebounce = null;
