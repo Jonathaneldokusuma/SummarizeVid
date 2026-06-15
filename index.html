@@ -241,6 +241,10 @@
       grid-template-columns:1.05fr .95fr;
       gap:18px;
     }
+    .stack{
+      display:grid;
+      gap:14px;
+    }
     .form-card, .output-card{
       border:1px solid var(--line);
       background:linear-gradient(180deg, rgba(30,30,30,.9), rgba(19,19,19,.95));
@@ -266,6 +270,23 @@
       outline:none;
     }
     input:focus{
+      border-color:rgba(245,200,66,.65);
+      box-shadow:0 0 0 4px rgba(245,200,66,.12);
+    }
+    textarea{
+      width:100%;
+      min-height:220px;
+      resize:vertical;
+      background:#121212;
+      border:1px solid #343434;
+      color:var(--text);
+      border-radius:12px;
+      padding:15px 14px;
+      font-size:15px;
+      outline:none;
+      line-height:1.6;
+    }
+    textarea:focus{
       border-color:rgba(245,200,66,.65);
       box-shadow:0 0 0 4px rgba(245,200,66,.12);
     }
@@ -401,22 +422,37 @@
             </div>
           </div>
           <div class="form-grid">
-            <div class="form-card">
-              <div class="field">
-                <label for="video">YouTube URL / ID</label>
-                <input id="video" placeholder="https://www.youtube.com/watch?v=VIDEO_ID" />
+            <div class="stack">
+              <div class="form-card">
+                <div class="field">
+                  <label for="video">YouTube URL / ID</label>
+                  <input id="video" placeholder="https://www.youtube.com/watch?v=VIDEO_ID" />
+                </div>
+                <div class="actions" style="margin-top:16px">
+                  <button class="btn primary" id="summarizeBtn">Execute Transmission</button>
+                  <button class="btn" id="jsonBtn">JSON Mode</button>
+                </div>
+                <div class="helper">Best for videos with captions. If the transcript is missing, use the listener below or summarize pasted text.</div>
+                <div class="chip-row">
+                  <span class="chip good">Public</span>
+                  <span class="chip good">Listed</span>
+                  <span class="chip">Transcript</span>
+                  <span class="chip">Extractive</span>
+                  <span class="chip">Vercel</span>
+                </div>
               </div>
-              <div class="actions" style="margin-top:16px">
-                <button class="btn primary" id="summarizeBtn">Execute Transmission</button>
-                <button class="btn" id="jsonBtn">JSON Mode</button>
-              </div>
-              <div class="helper">Works best on videos that expose transcripts. If captions are unavailable, the API will return a readable error.</div>
-              <div class="chip-row">
-                <span class="chip good">Public</span>
-                <span class="chip good">Listed</span>
-                <span class="chip">Transcript</span>
-                <span class="chip">Extractive</span>
-                <span class="chip">Vercel</span>
+
+              <div class="form-card">
+                <div class="field">
+                  <label for="liveTranscript">Live Listener Transcript</label>
+                  <textarea id="liveTranscript" placeholder="Use the listener to capture speech from your microphone, then summarize the text here."></textarea>
+                </div>
+                <div class="actions" style="margin-top:16px">
+                  <button class="btn primary" id="listenBtn">Start Listener</button>
+                  <button class="btn" id="stopListenBtn">Stop Listener</button>
+                  <button class="btn" id="summarizeTextBtn">Summarize Text</button>
+                </div>
+                <div class="helper" id="listenStatus">Listener is idle. Chrome works best for live speech recognition.</div>
               </div>
             </div>
             <div class="output-card">
@@ -493,7 +529,21 @@
   <script>
     const out = document.getElementById('out');
     const video = document.getElementById('video');
+    const liveTranscript = document.getElementById('liveTranscript');
+    const listenStatus = document.getElementById('listenStatus');
     let jsonMode = false;
+    let recognition = null;
+    let listening = false;
+
+    function summarizeText(text) {
+      return text
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(/(?<=[.!?])\s+/)
+        .filter(Boolean)
+        .slice(0, 6)
+        .join(' ');
+    }
 
     async function runSummary() {
       const link = video.value.trim();
@@ -521,7 +571,91 @@
       out.textContent = `${data.summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${data.transcriptCharacters} characters`;
     }
 
+    function appendTranscript(text) {
+      const cleaned = text.trim();
+      if (!cleaned) return;
+      liveTranscript.value = `${liveTranscript.value}${liveTranscript.value.trim() ? ' ' : ''}${cleaned}`;
+      liveTranscript.scrollTop = liveTranscript.scrollHeight;
+    }
+
+    function startListener() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        listenStatus.textContent = 'Speech recognition is not supported in this browser.';
+        return;
+      }
+
+      if (recognition) {
+        recognition.abort();
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        listening = true;
+        listenStatus.textContent = 'Listening... speak near the microphone while the video plays.';
+        document.getElementById('listenBtn').textContent = 'Listening...';
+      };
+
+      recognition.onresult = (event) => {
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalText += `${transcript} `;
+          }
+        }
+        appendTranscript(finalText);
+      };
+
+      recognition.onerror = (event) => {
+        listenStatus.textContent = `Listener error: ${event.error}`;
+      };
+
+      recognition.onend = () => {
+        listening = false;
+        document.getElementById('listenBtn').textContent = 'Start Listener';
+        if (listenStatus.textContent === 'Listening... speak near the microphone while the video plays.') {
+          listenStatus.textContent = 'Listener stopped.';
+        }
+      };
+
+      recognition.start();
+    }
+
+    function stopListener() {
+      if (recognition && listening) {
+        recognition.stop();
+      }
+      listening = false;
+      document.getElementById('listenBtn').textContent = 'Start Listener';
+      listenStatus.textContent = 'Listener stopped.';
+    }
+
     document.getElementById('summarizeBtn').addEventListener('click', runSummary);
+    document.getElementById('summarizeTextBtn').addEventListener('click', () => {
+      const text = liveTranscript.value.trim();
+      if (!text) {
+        out.innerHTML = '<span class="error">Paste or record some transcript text first.</span>';
+        return;
+      }
+
+      const summary = summarizeText(text);
+      const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+      const highlights = sentences.slice(0, 5).map((line) => `• ${line}`).join('\n');
+      out.textContent = `${summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${text.length} characters`;
+    });
+    document.getElementById('listenBtn').addEventListener('click', () => {
+      if (listening) {
+        stopListener();
+      } else {
+        startListener();
+      }
+    });
+    document.getElementById('stopListenBtn').addEventListener('click', stopListener);
     document.getElementById('go').addEventListener('click', () => document.getElementById('tool').scrollIntoView({ behavior: 'smooth' }));
     document.getElementById('jsonBtn').addEventListener('click', () => {
       jsonMode = !jsonMode;
