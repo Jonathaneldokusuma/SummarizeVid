@@ -44,3 +44,4 @@ node index.js "https://youtu.be/VIDEO_ID" --json
 - English transcripts are preferred when available
 - If YouTube does not expose captions for a video, the tool will stop with a clear error
 - Free fallback: use the browser mic listener or paste transcript text manually
+- No paid transcription service is required for the basic flow

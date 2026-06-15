@@ -509,7 +509,7 @@
                   <button class="btn primary" id="summarizeBtn">Execute Transmission</button>
                   <button class="btn" id="jsonBtn">JSON Mode</button>
                 </div>
-                <div class="helper">Best for videos with captions. If the transcript is missing, use the listener below or summarize pasted text.</div>
+                <div class="helper">Free mode only: uses YouTube captions when available, or the browser mic / pasted text when captions are missing.</div>
                 <div class="chip-row">
                   <span class="chip good">Public</span>
                   <span class="chip good">Listed</span>
@@ -522,7 +522,7 @@
               <div class="form-card">
                 <div class="field">
                   <label for="liveTranscript">Live Listener Transcript</label>
-                  <textarea id="liveTranscript" placeholder="Use the listener to capture speech from your microphone, then summarize the text here."></textarea>
+                  <textarea id="liveTranscript" placeholder="Use the free browser listener to capture your mic, or paste transcript text here."></textarea>
                 </div>
                 <div class="actions" style="margin-top:16px">
                   <button class="btn primary" id="listenBtn">Start Listener</button>
@@ -530,7 +530,7 @@
                   <button class="btn" id="summarizeTextBtn">Summarize Text</button>
                 </div>
                 <div class="live-chip idle" id="listenChip"><span class="dot"></span><span id="listenChipText">Idle</span></div>
-                <div class="helper" id="listenStatus">Listener is idle. Chrome works best for live speech recognition.</div>
+                <div class="helper" id="listenStatus">Free browser listener is idle. Chrome works best for live speech recognition.</div>
               </div>
             </div>
             <div class="output-card">
@@ -565,7 +565,7 @@
                 <span class="chip">Sentence Ranking</span>
                 <span class="chip">Highlight Lines</span>
                 <span class="chip">JSON Response</span>
-                <span class="chip">Minimal UI</span>
+                <span class="chip">Free Browser Listener</span>
               </div>
             </div>
           </div>
@@ -581,7 +581,7 @@
           <div class="form-grid">
             <div class="form-card">
               <div class="chip-row" style="margin-top:0">
-                <span class="chip good">System Status: Online</span>
+                <span class="chip good">System Status: Free</span>
                 <span class="chip">Transcript API</span>
                 <span class="chip">Dark UI</span>
                 <span class="chip">Yellow Accent</span>
@@ -589,8 +589,8 @@
             </div>
             <div class="form-card">
               <div class="summary-box" style="min-height:auto">
-                Match controls: line weight, card density, sidebar width, typography,
-                and the exact yellow tone.
+                Free path: captions first, then browser mic, then pasted text.
+                No paid transcription service required.
               </div>
             </div>
           </div>
