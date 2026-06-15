@@ -40,6 +40,7 @@ node index.js "https://youtu.be/VIDEO_ID" --json
 - `Key Lines`: high-signal transcript lines
 - `Full Transcript`: the cleaned transcript returned from captions or browser audio capture
 - `Transcript Length`: size of the extracted transcript text
+- Common ASR cleanup: removes audio markers, fixes spacing, and normalizes a small glossary of frequent misheard terms
 
 ## Notes
 

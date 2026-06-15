@@ -45,6 +45,45 @@ function extractTranscriptText(transcript) {
   return '';
 }
 
+const TRANSCRIPT_FIXES = [
+  [/\bAno\s*W?\.?\s+Purbo\b/gi, 'Onno W. Purbo'],
+  [/\bThangranxlatan\b/gi, 'Tangerang Selatan'],
+  [/\bInstitute of Technology in Tangerang Selatan\b/gi, 'Institute of Technology Tangerang Selatan'],
+  [/\bJonathan Postel'?s Surface Award\b/gi, 'Jonathan B. Postel Service Award'],
+  [/\bGenautte AI\b/gi, 'generative AI'],
+  [/\bGenautte\b/gi, 'generative'],
+  [/\bmulti[-\s]?modial\b/gi, 'multimodal'],
+  [/\bresponse space on user meet\b/gi, 'responses based on user needs'],
+  [/\bhelps adapts responses\b/gi, 'helps adapt responses'],
+  [/\bfour different process\b/gi, 'four different processes'],
+  [/\bAI too may\b/gi, 'AI tools may'],
+  [/\buser datai is\b/gi, 'user data. AI is'],
+  [/\bAI\s+and\s+considering\s+through\s+the\s+years\b/gi, 'AI and machine learning through the years'],
+];
+
+function cleanTranscriptText(text) {
+  let cleaned = String(text || '')
+    .replace(/\[(S|INAUDIBLE|MUSIC|APPLAUSE|BLANK_AUDIO|SILENCE|NOISE)\]/gi, ' ')
+    .replace(/&gt;&gt;|>>/g, ' ')
+    .replace(/\((the|un|or the other)\)/gi, ' ')
+    .replace(/\*+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/([.!?]){2,}/g, '$1')
+    .replace(/,\s*\./g, '.')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  for (const [pattern, replacement] of TRANSCRIPT_FIXES) {
+    cleaned = cleaned.replace(pattern, replacement);
+  }
+
+  return cleaned
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/([.!?]){2,}/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function splitSentences(text) {
   return text
     .replace(/\s+/g, ' ')
@@ -170,7 +209,7 @@ module.exports = async (req, res) => {
 
     const requestedLimit = Number(req.query.limit || req.body?.limit || 16);
     const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 16;
-    const cleanTranscript = transcript.replace(/\s+/g, ' ').trim();
+    const cleanTranscript = cleanTranscriptText(transcript);
     const summary = summarizeText(cleanTranscript, limit);
     const highlights = extractHighlights(cleanTranscript, Math.min(limit, 12));
 
