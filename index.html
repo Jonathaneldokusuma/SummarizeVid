@@ -771,12 +771,6 @@
       recognition.start();
     }
 
-    function ensureListener() {
-      if (!listening) {
-        startListener();
-      }
-    }
-
     function stopListener() {
       if (recognition && listening) {
         recognition.stop();
@@ -821,6 +815,11 @@
     async function startTabAudioListener() {
       if (!navigator.mediaDevices?.getDisplayMedia) {
         listenStatus.textContent = 'Tab audio capture is not supported in this browser.';
+        return;
+      }
+
+      if (typeof MediaRecorder === 'undefined') {
+        listenStatus.textContent = 'This browser cannot record tab audio.';
         return;
       }
 
@@ -900,6 +899,8 @@
           tabStream.getTracks().forEach((track) => track.stop());
           tabStream = null;
         }
+        tabRecorder = null;
+        tabChunks = [];
       }
     }
 
@@ -956,15 +957,12 @@
     });
     document.getElementById('loadPlayerBtn').addEventListener('click', loadPlayer);
     document.getElementById('clearPlayerBtn').addEventListener('click', clearPlayer);
-    playerFrame.addEventListener('click', ensureListener);
-    document.querySelector('.player-frame').addEventListener('dblclick', ensureListener);
     let playerDebounce = null;
     video.addEventListener('input', () => {
       clearTimeout(playerDebounce);
       playerDebounce = setTimeout(() => {
         if (video.value.trim()) {
           loadPlayer();
-          ensureListener();
         } else {
           clearPlayer();
         }
@@ -978,7 +976,6 @@
     document.getElementById('loadExample').addEventListener('click', () => {
       video.value = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
       loadPlayer();
-      ensureListener();
       document.getElementById('tool').scrollIntoView({ behavior: 'smooth' });
     });
   </script>
