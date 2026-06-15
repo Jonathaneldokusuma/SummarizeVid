@@ -1,4 +1,11 @@
-const { fetchTranscript: fetchYoutubeTranscript } = require('youtube-transcript');
+const {
+  fetchTranscript: fetchYoutubeTranscript,
+  YoutubeTranscriptDisabledError,
+  YoutubeTranscriptNotAvailableError,
+  YoutubeTranscriptNotAvailableLanguageError,
+  YoutubeTranscriptTooManyRequestError,
+  YoutubeTranscriptVideoUnavailableError,
+} = require('youtube-transcript');
 
 function parseVideoId(input) {
   if (!input) return null;
@@ -98,6 +105,46 @@ async function fetchTranscript(videoInput) {
   return extractTranscriptText(transcript);
 }
 
+function formatTranscriptError(error, videoId) {
+  if (
+    error instanceof YoutubeTranscriptDisabledError ||
+    /disabled on this video/i.test(error.message || '')
+  ) {
+    return {
+      status: 422,
+      message: `Transcript is disabled for video ${videoId}. Try another public or listed video that has captions enabled.`,
+    };
+  }
+
+  if (
+    error instanceof YoutubeTranscriptNotAvailableError ||
+    error instanceof YoutubeTranscriptNotAvailableLanguageError ||
+    error instanceof YoutubeTranscriptVideoUnavailableError ||
+    /not available/i.test(error.message || '') ||
+    /video unavailable/i.test(error.message || '')
+  ) {
+    return {
+      status: 422,
+      message: `Transcript is not available for video ${videoId}.`,
+    };
+  }
+
+  if (
+    error instanceof YoutubeTranscriptTooManyRequestError ||
+    /too many request/i.test(error.message || '')
+  ) {
+    return {
+      status: 429,
+      message: 'Transcript service rate limit reached. Please try again in a moment.',
+    };
+  }
+
+  return {
+    status: 500,
+    message: error.message || 'Failed to summarize video.',
+  };
+}
+
 const STOP_WORDS = new Set([
   'the', 'and', 'for', 'that', 'with', 'this', 'from', 'have', 'are', 'was', 'were',
   'been', 'you', 'your', 'but', 'not', 'can', 'will', 'would', 'could', 'should',
@@ -132,6 +179,7 @@ module.exports = async (req, res) => {
       transcriptCharacters: transcript.length,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message || 'Failed to summarize video.' });
+    const failure = formatTranscriptError(error, parseVideoId(req.query.video || req.body?.video) || 'that video');
+    res.status(failure.status).json({ error: failure.message });
   }
 };

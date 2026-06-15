@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 
-const { fetchTranscript: fetchYoutubeTranscript } = require('youtube-transcript');
+const {
+  fetchTranscript: fetchYoutubeTranscript,
+  YoutubeTranscriptDisabledError,
+  YoutubeTranscriptNotAvailableError,
+  YoutubeTranscriptNotAvailableLanguageError,
+  YoutubeTranscriptTooManyRequestError,
+  YoutubeTranscriptVideoUnavailableError,
+} = require('youtube-transcript');
 
 function parseVideoId(input) {
   if (!input) return null;
@@ -57,6 +64,34 @@ async function fetchTranscript(videoInput) {
 
   const transcript = await fetchYoutubeTranscript(videoId);
   return extractTranscriptText(transcript);
+}
+
+function formatTranscriptError(error, videoId) {
+  if (
+    error instanceof YoutubeTranscriptDisabledError ||
+    /disabled on this video/i.test(error.message || '')
+  ) {
+    return `Transcript is disabled for video ${videoId}. Try another public or listed video that has captions enabled.`;
+  }
+
+  if (
+    error instanceof YoutubeTranscriptNotAvailableError ||
+    error instanceof YoutubeTranscriptNotAvailableLanguageError ||
+    error instanceof YoutubeTranscriptVideoUnavailableError ||
+    /not available/i.test(error.message || '') ||
+    /video unavailable/i.test(error.message || '')
+  ) {
+    return `Transcript is not available for video ${videoId}.`;
+  }
+
+  if (
+    error instanceof YoutubeTranscriptTooManyRequestError ||
+    /too many request/i.test(error.message || '')
+  ) {
+    return 'Transcript service rate limit reached. Please try again in a moment.';
+  }
+
+  return error.message || 'Failed to summarize video.';
 }
 
 function splitSentences(text) {
@@ -185,7 +220,8 @@ async function main() {
 
     process.exit(0);
   } catch (error) {
-    console.error('Error:', error.message || error);
+    const videoId = parseVideoId(input) || input;
+    console.error('Error:', formatTranscriptError(error, videoId));
     process.exit(1);
   }
 }
