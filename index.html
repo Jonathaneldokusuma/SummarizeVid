@@ -310,6 +310,32 @@
       padding:16px;
       overflow:auto;
     }
+    .player-frame{
+      width:100%;
+      aspect-ratio:16/9;
+      border:1px solid #2f2f2f;
+      border-radius:14px;
+      background:#0c0c0c;
+      overflow:hidden;
+    }
+    .player-frame iframe{
+      width:100%;
+      height:100%;
+      border:0;
+      display:block;
+    }
+    .player-placeholder{
+      display:grid;
+      place-items:center;
+      width:100%;
+      height:100%;
+      color:#8f8f8f;
+      text-transform:uppercase;
+      letter-spacing:.18em;
+      font-size:11px;
+      text-align:center;
+      padding:16px;
+    }
     .chip-row{
       display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;
     }
@@ -425,6 +451,20 @@
             <div class="stack">
               <div class="form-card">
                 <div class="field">
+                  <label for="playerUrl">Video Preview</label>
+                </div>
+                <div class="player-frame" id="playerFrame">
+                  <div class="player-placeholder">Load a YouTube link to play it here</div>
+                </div>
+                <div class="actions" style="margin-top:16px">
+                  <button class="btn primary" id="loadPlayerBtn">Load Player</button>
+                  <button class="btn" id="clearPlayerBtn">Clear Player</button>
+                </div>
+                <div class="helper">The video plays directly in the page. Use the listener or captions tools alongside it.</div>
+              </div>
+
+              <div class="form-card">
+                <div class="field">
                   <label for="video">YouTube URL / ID</label>
                   <input id="video" placeholder="https://www.youtube.com/watch?v=VIDEO_ID" />
                 </div>
@@ -529,11 +569,36 @@
   <script>
     const out = document.getElementById('out');
     const video = document.getElementById('video');
+    const playerFrame = document.getElementById('playerFrame');
     const liveTranscript = document.getElementById('liveTranscript');
     const listenStatus = document.getElementById('listenStatus');
     let jsonMode = false;
     let recognition = null;
     let listening = false;
+
+    function parseVideoId(input) {
+      if (!input) return null;
+      const trimmed = String(input).trim();
+      if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+
+      try {
+        const parsed = new URL(trimmed);
+        const host = parsed.hostname.replace(/^www\./, '');
+        if (host === 'youtu.be') {
+          return parsed.pathname.split('/').filter(Boolean)[0] || null;
+        }
+        if (host.endsWith('youtube.com')) {
+          const videoId = parsed.searchParams.get('v');
+          if (videoId) return videoId;
+          const parts = parsed.pathname.split('/').filter(Boolean);
+          return parts.find((part) => /^[a-zA-Z0-9_-]{11}$/.test(part)) || null;
+        }
+      } catch {
+        return null;
+      }
+
+      return null;
+    }
 
     function summarizeText(text) {
       return text
@@ -569,6 +634,25 @@
 
       const highlights = (data.highlights || []).map((item) => `• ${item}`).join('\n');
       out.textContent = `${data.summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${data.transcriptCharacters} characters`;
+    }
+
+    function loadPlayer() {
+      const id = parseVideoId(video.value.trim());
+      if (!id) {
+        playerFrame.innerHTML = '<div class="player-placeholder">Enter a valid YouTube URL first</div>';
+        return;
+      }
+
+      playerFrame.innerHTML = `<iframe
+        src="https://www.youtube.com/embed/${id}"
+        title="YouTube video player"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+      ></iframe>`;
+    }
+
+    function clearPlayer() {
+      playerFrame.innerHTML = '<div class="player-placeholder">Load a YouTube link to play it here</div>';
     }
 
     function appendTranscript(text) {
@@ -656,6 +740,8 @@
       }
     });
     document.getElementById('stopListenBtn').addEventListener('click', stopListener);
+    document.getElementById('loadPlayerBtn').addEventListener('click', loadPlayer);
+    document.getElementById('clearPlayerBtn').addEventListener('click', clearPlayer);
     document.getElementById('go').addEventListener('click', () => document.getElementById('tool').scrollIntoView({ behavior: 'smooth' }));
     document.getElementById('jsonBtn').addEventListener('click', () => {
       jsonMode = !jsonMode;
@@ -663,6 +749,7 @@
     });
     document.getElementById('loadExample').addEventListener('click', () => {
       video.value = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+      loadPlayer();
       document.getElementById('tool').scrollIntoView({ behavior: 'smooth' });
     });
   </script>
