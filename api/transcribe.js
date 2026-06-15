@@ -39,7 +39,7 @@ module.exports = async (req, res) => {
       body: form,
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       return withJson(res, response.status, { error: data.error?.message || 'Transcription failed.' });
     }

@@ -621,6 +621,7 @@
     let tabRecorder = null;
     let tabChunks = [];
     let tabListening = false;
+    let tabStopping = false;
 
     function parseVideoId(input) {
       if (!input) return null;
@@ -824,6 +825,7 @@
       }
 
       try {
+        tabStopping = false;
         setTabListeningUi(true, 'Sharing');
         listenStatus.textContent = 'Pick the YouTube tab and enable audio sharing.';
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
@@ -848,6 +850,10 @@
         };
 
         tabRecorder.onstop = async () => {
+          if (tabStopping) {
+            return;
+          }
+          tabStopping = true;
           try {
             setTabListeningUi(false, 'Transcribing');
             listenStatus.textContent = 'Transcribing shared tab audio...';
@@ -898,8 +904,16 @@
     }
 
     function stopTabAudioListener() {
+      if (tabStopping) {
+        return;
+      }
+      tabStopping = true;
       if (tabRecorder && tabRecorder.state !== 'inactive') {
-        tabRecorder.stop();
+        try {
+          tabRecorder.stop();
+        } catch {
+          // Ignore recorder shutdown races.
+        }
       }
       if (tabStream) {
         tabStream.getTracks().forEach((track) => track.stop());
@@ -909,6 +923,7 @@
       tabChunks = [];
       tabListening = false;
       setTabListeningUi(false, 'Share Tab Audio');
+      tabStopping = false;
     }
 
     document.getElementById('summarizeBtn').addEventListener('click', runSummary);
