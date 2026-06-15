@@ -3,38 +3,534 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SummarizeVid</title>
+  <title>SummarizeVid // ARCHITECT</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; min-height: 100vh; background: linear-gradient(135deg, #101828, #1d4ed8); color: white; display: grid; place-items: center; }
-    .card { width: min(720px, calc(100vw - 32px)); background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 24px; box-shadow: 0 20px 80px rgba(0,0,0,0.25); }
-    input, button, textarea { width: 100%; box-sizing: border-box; border-radius: 12px; border: 0; padding: 14px; font-size: 16px; }
-    input, textarea { margin: 10px 0; }
-    input, textarea { background: rgba(255,255,255,0.95); color: #111827; }
-    button { background: #22c55e; color: white; font-weight: 700; cursor: pointer; }
-    pre { white-space: pre-wrap; background: rgba(15,23,42,0.8); padding: 16px; border-radius: 12px; overflow: auto; }
-    .muted { color: rgba(255,255,255,0.75); }
+    :root{
+      --bg:#0f0f0f;
+      --panel:#171717;
+      --panel-2:#1d1d1d;
+      --line:#2d2d2d;
+      --text:#efefef;
+      --muted:#a6a6a6;
+      --accent:#f5c842;
+      --accent-2:#d4aa1f;
+      --good:#59d36a;
+      --shadow:0 24px 90px rgba(0,0,0,.45);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      color:var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(245,200,66,.08), transparent 22%),
+        radial-gradient(circle at 80% 30%, rgba(245,200,66,.05), transparent 18%),
+        linear-gradient(180deg, #141414 0%, #0b0b0b 100%);
+      overflow-x:hidden;
+    }
+    body:before{
+      content:"";
+      position:fixed; inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+      background-size: 100% 28px, 28px 100%;
+      mix-blend-mode:screen;
+      opacity:.45;
+    }
+    .shell{
+      max-width:1280px;
+      margin:0 auto;
+      padding:18px 18px 28px;
+      position:relative;
+      z-index:1;
+    }
+    .topbar, .panel, .hero, .section, .footer{
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(28,28,28,.94), rgba(18,18,18,.94));
+      box-shadow:var(--shadow);
+    }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 18px;
+      border-radius:18px;
+      position:sticky; top:12px;
+      backdrop-filter: blur(12px);
+      z-index:10;
+    }
+    .brand{
+      display:flex; align-items:baseline; gap:10px;
+      font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+    }
+    .brand strong{color:var(--accent)}
+    .nav{
+      display:flex; gap:18px; flex-wrap:wrap;
+      font-size:12px; letter-spacing:.16em; text-transform:uppercase;
+      color:#bbb;
+    }
+    .nav a{color:inherit; text-decoration:none}
+    .nav a:hover{color:var(--accent)}
+    .auth{
+      background:var(--accent);
+      color:#111;
+      border:0;
+      border-radius:999px;
+      padding:10px 14px;
+      font-weight:800;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      font-size:11px;
+    }
+    .workspace{
+      display:grid;
+      grid-template-columns: 220px minmax(0,1fr);
+      gap:18px;
+      margin-top:18px;
+    }
+    .rail{
+      border-radius:18px;
+      overflow:hidden;
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(24,24,24,.98), rgba(17,17,17,.98));
+      align-self:start;
+      position:sticky;
+      top:84px;
+    }
+    .rail-head{
+      padding:18px;
+      border-bottom:1px solid var(--line);
+      background:linear-gradient(135deg, rgba(245,200,66,.12), transparent 55%);
+    }
+    .rail-head .label{
+      font-size:11px; letter-spacing:.18em; color:var(--accent); text-transform:uppercase;
+    }
+    .rail-head h2{margin:10px 0 0; font-size:18px}
+    .menu{padding:10px}
+    .menu a{
+      display:flex; align-items:center; gap:10px;
+      padding:12px 14px; margin:6px 0;
+      text-decoration:none; color:#c8c8c8;
+      border-radius:12px; font-size:13px; letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .menu a.active, .menu a:hover{
+      background:rgba(245,200,66,.12);
+      color:var(--text);
+      border:1px solid rgba(245,200,66,.18);
+    }
+    .content{display:grid; gap:18px}
+    .hero{
+      border-radius:24px;
+      padding:30px;
+      position:relative;
+      overflow:hidden;
+      min-height:340px;
+    }
+    .hero:before{
+      content:"";
+      position:absolute; inset:-1px;
+      background:
+        radial-gradient(circle at 68% 40%, rgba(245,200,66,.08), transparent 28%),
+        linear-gradient(135deg, rgba(245,200,66,.09), transparent 35%);
+      pointer-events:none;
+    }
+    .eyebrow{
+      display:inline-flex;
+      padding:8px 12px;
+      border:1px solid rgba(245,200,66,.25);
+      background:rgba(245,200,66,.08);
+      color:var(--accent);
+      text-transform:uppercase;
+      letter-spacing:.22em;
+      font-size:11px;
+      border-radius:999px;
+      position:relative;
+      z-index:1;
+    }
+    .hero-grid{
+      display:grid;
+      grid-template-columns: 1.4fr .8fr;
+      gap:24px;
+      margin-top:18px;
+      position:relative;
+      z-index:1;
+    }
+    .hero h1{
+      margin:10px 0 0;
+      line-height:.9;
+      text-transform:uppercase;
+      letter-spacing:-.05em;
+      font-size: clamp(54px, 8vw, 112px);
+    }
+    .hero h1 .light{display:block; color:#f5f5f5}
+    .hero h1 .accent{display:block; color:var(--accent)}
+    .hero p{
+      max-width:720px;
+      color:#c9c9c9;
+      font-size:16px;
+      line-height:1.7;
+      margin:18px 0 0;
+    }
+    .actions{display:flex; gap:12px; flex-wrap:wrap; margin-top:22px}
+    .btn{
+      border-radius:12px;
+      padding:13px 18px;
+      text-transform:uppercase;
+      letter-spacing:.14em;
+      font-size:12px;
+      font-weight:800;
+      border:1px solid var(--line);
+      background:#1b1b1b;
+      color:var(--text);
+      cursor:pointer;
+    }
+    .btn.primary{background:var(--accent); color:#131313; border-color:transparent}
+    .hero-aside{
+      display:grid; gap:12px; align-content:start;
+    }
+    .mini{
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.02);
+      border-radius:16px;
+      padding:14px;
+    }
+    .mini .k{font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent)}
+    .mini .v{margin-top:8px; color:#d9d9d9; line-height:1.5}
+    .stats{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:12px;
+      margin-top:24px;
+      position:relative;
+      z-index:1;
+    }
+    .stat{
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      border-radius:16px;
+      padding:16px;
+    }
+    .stat .num{font-size:32px; font-weight:900; color:var(--accent)}
+    .stat .label{margin-top:6px; text-transform:uppercase; letter-spacing:.16em; font-size:11px; color:#bdbdbd}
+    .section{
+      border-radius:24px;
+      padding:26px;
+    }
+    .section-head{
+      display:flex; align-items:end; justify-content:space-between; gap:18px; flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+    .section-title{
+      margin:0;
+      text-transform:uppercase;
+      letter-spacing:-.04em;
+      font-size: clamp(28px, 3vw, 46px);
+    }
+    .section-title .accent{color:var(--accent)}
+    .sub{
+      color:var(--muted);
+      max-width:760px;
+      line-height:1.65;
+      margin:8px 0 0;
+    }
+    .form-grid{
+      display:grid;
+      grid-template-columns:1.05fr .95fr;
+      gap:18px;
+    }
+    .form-card, .output-card{
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(30,30,30,.9), rgba(19,19,19,.95));
+      border-radius:18px;
+      padding:18px;
+    }
+    .field label{
+      display:block;
+      margin-bottom:8px;
+      color:var(--accent);
+      text-transform:uppercase;
+      font-size:11px;
+      letter-spacing:.18em;
+    }
+    input{
+      width:100%;
+      background:#121212;
+      border:1px solid #343434;
+      color:var(--text);
+      border-radius:12px;
+      padding:15px 14px;
+      font-size:15px;
+      outline:none;
+    }
+    input:focus{
+      border-color:rgba(245,200,66,.65);
+      box-shadow:0 0 0 4px rgba(245,200,66,.12);
+    }
+    .helper{
+      margin-top:10px;
+      color:#8f8f8f;
+      font-size:13px;
+      line-height:1.5;
+    }
+    .summary-box{
+      min-height:240px;
+      white-space:pre-wrap;
+      color:#e9e9e9;
+      line-height:1.75;
+      font-size:15px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)),
+        #111;
+      border:1px solid #2f2f2f;
+      border-radius:14px;
+      padding:16px;
+      overflow:auto;
+    }
+    .chip-row{
+      display:flex; flex-wrap:wrap; gap:8px; margin-top:14px;
+    }
+    .chip{
+      padding:8px 10px;
+      border-radius:999px;
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.16em;
+      color:#d8d8d8;
+      border:1px solid #343434;
+      background:#181818;
+    }
+    .chip.good{color:var(--good); border-color:rgba(89,211,106,.3)}
+    .footer{
+      margin-top:18px;
+      border-radius:18px;
+      padding:14px 18px;
+      display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      color:#aaa;
+      text-transform:uppercase;
+      letter-spacing:.16em;
+      font-size:11px;
+    }
+    .error{color:#ffb4b4}
+    @media (max-width: 980px){
+      .workspace{grid-template-columns:1fr}
+      .rail{position:relative; top:auto}
+      .hero-grid,.form-grid,.stats{grid-template-columns:1fr}
+      .hero{padding:22px}
+    }
+    @media (max-width: 640px){
+      .topbar{gap:12px; align-items:flex-start; flex-direction:column}
+      .nav{gap:10px}
+      .hero h1{font-size:48px}
+      .shell{padding:12px}
+      .section{padding:18px}
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>SummarizeVid</h1>
-    <p class="muted">Paste a public or listed YouTube URL and get a transcript-based summary.</p>
-    <input id="video" placeholder="https://www.youtube.com/watch?v=..." />
-    <button id="go">Summarize</button>
-    <pre id="out">Waiting for a video link...</pre>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand"><strong>SummarizeVid</strong><span>// ARCHITECT</span></div>
+      <nav class="nav" aria-label="Primary">
+        <a href="#dashboard">Dashboard</a>
+        <a href="#archive">Archive</a>
+        <a href="#tool">Tech Stack</a>
+        <a href="#comms">Comms</a>
+      </nav>
+      <button class="auth">Auth Req</button>
+    </header>
+
+    <div class="workspace">
+      <aside class="rail">
+        <div class="rail-head">
+          <div class="label">Operator</div>
+          <h2>YT SUMMARY ENGINE</h2>
+        </div>
+        <div class="menu">
+          <a class="active" href="#dashboard">Dashboard</a>
+          <a href="#archive">Archive</a>
+          <a href="#tool">Summarize</a>
+          <a href="#comms">Comms</a>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="hero" id="dashboard">
+          <span class="eyebrow">Archive // Online</span>
+          <div class="hero-grid">
+            <div>
+              <h1><span class="light">Summarize</span><span class="accent">YouTube</span></h1>
+              <p>
+                Paste a public or listed video URL, then extract a transcript-driven brief with high-signal lines and a clean summary.
+                The interface is styled like a technical portfolio terminal to match your reference.
+              </p>
+              <div class="actions">
+                <button class="btn primary" id="go">Access Archive</button>
+                <button class="btn" id="loadExample">Open Demo</button>
+              </div>
+            </div>
+            <div class="hero-aside">
+              <div class="mini">
+                <div class="k">Input</div>
+                <div class="v">Public, listed, standard YouTube links, or 11-character video IDs.</div>
+              </div>
+              <div class="mini">
+                <div class="k">Output</div>
+                <div class="v">Summary, key lines, transcript length, and JSON mode for API reuse.</div>
+              </div>
+              <div class="mini">
+                <div class="k">Status</div>
+                <div class="v"><span style="color:var(--good);font-weight:800">Online</span> with transcript extraction enabled.</div>
+              </div>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="num">01</div><div class="label">Summarizer Node</div></div>
+            <div class="stat"><div class="num">02</div><div class="label">API Route</div></div>
+            <div class="stat"><div class="num">03</div><div class="label">Vercel Ready</div></div>
+          </div>
+        </section>
+
+        <section class="section" id="tool">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">System <span class="accent">Module</span></h2>
+              <p class="sub">Use the field below to run the summary engine. The visual design is intentionally industrial, high contrast, and grid-heavy like your reference.</p>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-card">
+              <div class="field">
+                <label for="video">YouTube URL / ID</label>
+                <input id="video" placeholder="https://www.youtube.com/watch?v=VIDEO_ID" />
+              </div>
+              <div class="actions" style="margin-top:16px">
+                <button class="btn primary" id="summarizeBtn">Execute Transmission</button>
+                <button class="btn" id="jsonBtn">JSON Mode</button>
+              </div>
+              <div class="helper">Works best on videos that expose transcripts. If captions are unavailable, the API will return a readable error.</div>
+              <div class="chip-row">
+                <span class="chip good">Public</span>
+                <span class="chip good">Listed</span>
+                <span class="chip">Transcript</span>
+                <span class="chip">Extractive</span>
+                <span class="chip">Vercel</span>
+              </div>
+            </div>
+            <div class="output-card">
+              <div class="field">
+                <label>Summary Output</label>
+              </div>
+              <div id="out" class="summary-box">Waiting for an input link...</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="archive">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Active <span class="accent">Repositories</span></h2>
+              <p class="sub">The tool currently exposes both the web UI and the serverless endpoint. The archive area is just a visual callout to match the reference page style.</p>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-card">
+              <div class="field"><label>Core</label></div>
+              <div class="summary-box" style="min-height:auto">
+                `api/summarize.js` handles transcript fetch + summary generation.<br>
+                `index.html` provides the terminal-style interface.<br>
+                `index.js` remains as the CLI entrypoint.
+              </div>
+            </div>
+            <div class="form-card">
+              <div class="field"><label>Capabilities</label></div>
+              <div class="chip-row" style="margin-top:0">
+                <span class="chip">URL Parsing</span>
+                <span class="chip">Sentence Ranking</span>
+                <span class="chip">Highlight Lines</span>
+                <span class="chip">JSON Response</span>
+                <span class="chip">Minimal UI</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="comms">
+          <div class="section-head">
+            <div>
+              <h2 class="section-title">Establish <span class="accent">Comms</span></h2>
+              <p class="sub">If you want, I can keep iterating on this look until it matches the screenshot even closer, including more precise spacing, section labels, and grid rhythm.</p>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-card">
+              <div class="chip-row" style="margin-top:0">
+                <span class="chip good">System Status: Online</span>
+                <span class="chip">Transcript API</span>
+                <span class="chip">Dark UI</span>
+                <span class="chip">Yellow Accent</span>
+              </div>
+            </div>
+            <div class="form-card">
+              <div class="summary-box" style="min-height:auto">
+                Send another screenshot if you want a tighter match on:
+                line weight, card density, sidebar width, typography, or the exact yellow tone.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="footer">
+          <span>SummarizeVid // 2026</span>
+          <span>GitHub / Vercel / API</span>
+        </footer>
+      </main>
+    </div>
   </div>
+
   <script>
     const out = document.getElementById('out');
-    document.getElementById('go').onclick = async () => {
-      const video = document.getElementById('video').value.trim();
-      if (!video) return out.textContent = 'Paste a YouTube link first.';
-      out.textContent = 'Loading...';
-      const res = await fetch(`/api/summarize?video=${encodeURIComponent(video)}&limit=6`);
+    const video = document.getElementById('video');
+    let jsonMode = false;
+
+    async function runSummary() {
+      const link = video.value.trim();
+      if (!link) {
+        out.innerHTML = '<span class="error">Paste a YouTube link first.</span>';
+        return;
+      }
+
+      out.textContent = 'Executing transmission...';
+      const url = `/api/summarize?video=${encodeURIComponent(link)}&limit=6`;
+      const res = await fetch(url);
       const data = await res.json();
-      out.textContent = res.ok
-        ? `${data.summary}\n\nHighlights:\n- ${data.highlights.join('\n- ')}`
-        : `Error: ${data.error}`;
-    };
+
+      if (!res.ok) {
+        out.innerHTML = `<span class="error">Error:</span> ${data.error || 'Failed to summarize.'}`;
+        return;
+      }
+
+      if (jsonMode) {
+        out.textContent = JSON.stringify(data, null, 2);
+        return;
+      }
+
+      const highlights = (data.highlights || []).map((item) => `• ${item}`).join('\n');
+      out.textContent = `${data.summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${data.transcriptCharacters} characters`;
+    }
+
+    document.getElementById('summarizeBtn').addEventListener('click', runSummary);
+    document.getElementById('go').addEventListener('click', () => document.getElementById('tool').scrollIntoView({ behavior: 'smooth' }));
+    document.getElementById('jsonBtn').addEventListener('click', () => {
+      jsonMode = !jsonMode;
+      document.getElementById('jsonBtn').textContent = jsonMode ? 'Text Mode' : 'JSON Mode';
+    });
+    document.getElementById('loadExample').addEventListener('click', () => {
+      video.value = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+      document.getElementById('tool').scrollIntoView({ behavior: 'smooth' });
+    });
   </script>
 </body>
 </html>
