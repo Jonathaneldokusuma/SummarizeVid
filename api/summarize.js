@@ -1,4 +1,4 @@
-const { getTranscripts } = require('youtube-transcript');
+const { fetchTranscript: fetchYoutubeTranscript } = require('youtube-transcript');
 
 function parseVideoId(input) {
   if (!input) return null;
@@ -94,13 +94,8 @@ async function fetchTranscript(videoInput) {
   const videoId = parseVideoId(videoInput);
   if (!videoId) throw new Error('Invalid YouTube URL or video ID.');
 
-  const transcripts = await getTranscripts(videoId);
-  const preferred =
-    transcripts.find((t) => /^en(-|$)/i.test(t.language || t.languageCode || '')) ||
-    transcripts.find((t) => (t.language || '').toLowerCase().startsWith('en')) ||
-    transcripts[0];
-
-  return extractTranscriptText(preferred.transcript || preferred.text || preferred);
+  const transcript = await fetchYoutubeTranscript(videoId);
+  return extractTranscriptText(transcript);
 }
 
 const STOP_WORDS = new Set([

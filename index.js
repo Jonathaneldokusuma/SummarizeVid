@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { getTranscripts } = require('youtube-transcript');
+const { fetchTranscript: fetchYoutubeTranscript } = require('youtube-transcript');
 
 function parseVideoId(input) {
   if (!input) return null;
@@ -55,17 +55,8 @@ async function fetchTranscript(videoInput) {
     throw new Error('Unable to parse a valid YouTube video ID from that input.');
   }
 
-  const transcripts = await getTranscripts(videoId);
-  if (!transcripts || transcripts.length === 0) {
-    throw new Error('No transcript is available for this video.');
-  }
-
-  const preferred =
-    transcripts.find((t) => /^en(-|$)/i.test(t.language || t.languageCode || '')) ||
-    transcripts.find((t) => (t.language || '').toLowerCase().startsWith('en')) ||
-    transcripts[0];
-
-  return extractTranscriptText(preferred.transcript || preferred.text || preferred);
+  const transcript = await fetchYoutubeTranscript(videoId);
+  return extractTranscriptText(transcript);
 }
 
 function splitSentences(text) {
