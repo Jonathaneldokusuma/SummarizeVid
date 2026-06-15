@@ -43,5 +43,6 @@ node index.js "https://youtu.be/VIDEO_ID" --json
 
 - English transcripts are preferred when available
 - If YouTube does not expose captions for a video, the tool will stop with a clear error
-- Free fallback: use the browser mic listener or paste transcript text manually
-- No paid transcription service is required for the basic flow
+- Free fallback: record shared tab audio and transcribe it in the browser, or paste transcript text manually
+- No paid transcription service or API key is required for the basic flow
+- The browser will download a free speech model the first time tab-audio transcription runs
