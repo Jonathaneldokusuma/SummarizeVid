@@ -644,7 +644,7 @@
       }
 
       playerFrame.innerHTML = `<iframe
-        src="https://www.youtube.com/embed/${id}"
+        src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1&rel=0"
         title="YouTube video player"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowfullscreen
@@ -742,6 +742,17 @@
     document.getElementById('stopListenBtn').addEventListener('click', stopListener);
     document.getElementById('loadPlayerBtn').addEventListener('click', loadPlayer);
     document.getElementById('clearPlayerBtn').addEventListener('click', clearPlayer);
+    let playerDebounce = null;
+    video.addEventListener('input', () => {
+      clearTimeout(playerDebounce);
+      playerDebounce = setTimeout(() => {
+        if (video.value.trim()) {
+          loadPlayer();
+        } else {
+          clearPlayer();
+        }
+      }, 250);
+    });
     document.getElementById('go').addEventListener('click', () => document.getElementById('tool').scrollIntoView({ behavior: 'smooth' }));
     document.getElementById('jsonBtn').addEventListener('click', () => {
       jsonMode = !jsonMode;
