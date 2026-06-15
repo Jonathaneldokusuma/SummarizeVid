@@ -275,7 +275,7 @@
     }
     textarea{
       width:100%;
-      min-height:220px;
+      min-height:320px;
       resize:vertical;
       background:#121212;
       border:1px solid #343434;
@@ -334,7 +334,7 @@
       100%{box-shadow:0 0 0 0 rgba(89,211,106,0)}
     }
     .summary-box{
-      min-height:240px;
+      min-height:520px;
       white-space:pre-wrap;
       color:#e9e9e9;
       line-height:1.75;
@@ -529,7 +529,7 @@
                   <button class="btn" id="summarizeTextBtn">Summarize Text</button>
                 </div>
                 <div class="live-chip idle" id="listenChip"><span class="dot"></span><span id="listenChipText">Idle</span></div>
-                <div class="helper" id="listenStatus">Use Record Video Audio for the YouTube tab sound. Select the tab and enable audio sharing.</div>
+                <div class="helper" id="listenStatus">Use Record Video Audio for the YouTube tab sound. Select the tab and enable audio sharing. The first transcription downloads a larger free model for better accuracy.</div>
               </div>
             </div>
             <div class="output-card">
@@ -618,10 +618,31 @@
     const shareTabBtn = document.getElementById('shareTabBtn');
     let jsonMode = false;
     let tabStream = null;
-    let tabRecorder = null;
-    let tabChunks = [];
+    let tabAudioContext = null;
+    let tabSource = null;
+    let tabProcessor = null;
+    let tabSilentGain = null;
+    let tabBuffers = [];
+    let tabBufferedSamples = 0;
+    let tabSampleRate = 48000;
+    let tabChunkNumber = 0;
+    let transcriptionQueue = Promise.resolve();
+    let capturedSpeech = false;
     let tabSharing = false;
+    let stoppingTabAudio = false;
     let transcriberPromise = null;
+    const SUMMARY_SENTENCE_LIMIT = 16;
+    const HIGHLIGHT_LIMIT = 12;
+    const CAPTURE_CHUNK_SECONDS = 60;
+    const STOP_WORDS = new Set([
+      'the', 'and', 'for', 'that', 'with', 'this', 'from', 'have', 'are', 'was', 'were',
+      'been', 'you', 'your', 'but', 'not', 'can', 'will', 'would', 'could', 'should',
+      'they', 'their', 'about', 'into', 'what', 'when', 'where', 'which', 'while', 'there',
+      'here', 'then', 'than', 'them', 'who', 'how', 'why', 'all', 'any', 'our', 'out',
+      'just', 'like', 'over', 'also', 'more', 'some', 'most', 'many', 'much', 'very',
+      'one', 'two', 'three', 'because', 'these', 'those', 'such', 'its', 'it', 'as',
+      'on', 'in', 'at', 'to', 'of', 'a', 'an', 'is', 'are', 'or'
+    ]);
 
     function parseVideoId(input) {
       if (!input) return null;
@@ -647,14 +668,99 @@
       return null;
     }
 
-    function summarizeText(text) {
+    function splitSentences(text) {
       return text
         .replace(/\s+/g, ' ')
         .trim()
-        .split(/(?<=[.!?])\s+/)
-        .filter(Boolean)
-        .slice(0, 6)
+        .match(/[^.!?]+[.!?]+|[^.!?]+$/g)
+        ?.map((sentence) => sentence.trim())
+        .filter(Boolean) || [];
+    }
+
+    function tokenize(text) {
+      return text
+        .toLowerCase()
+        .replace(/[^a-z0-9'\s]/g, ' ')
+        .split(/\s+/)
+        .filter((word) => word.length > 2 && !STOP_WORDS.has(word));
+    }
+
+    function summarizeText(text, maxSentences = SUMMARY_SENTENCE_LIMIT) {
+      const sentences = splitSentences(text);
+      if (sentences.length <= maxSentences) {
+        return sentences.join(' ');
+      }
+
+      const wordScores = new Map();
+      for (const word of tokenize(text)) {
+        wordScores.set(word, (wordScores.get(word) || 0) + 1);
+      }
+
+      return sentences
+        .map((sentence, index) => {
+          const words = tokenize(sentence);
+          const score = words.reduce((total, word) => total + (wordScores.get(word) || 0), 0);
+          return { index, sentence, score: score / Math.max(words.length, 1) };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, maxSentences)
+        .sort((a, b) => a.index - b.index)
+        .map((item) => item.sentence)
         .join(' ');
+    }
+
+    function extractHighlights(text, limit = HIGHLIGHT_LIMIT) {
+      const sentences = splitSentences(text);
+      const counts = tokenize(text).reduce((acc, word) => acc.set(word, (acc.get(word) || 0) + 1), new Map());
+
+      return sentences
+        .map((sentence) => ({
+          sentence,
+          score: tokenize(sentence).reduce((total, word) => total + (counts.get(word) || 0), 0),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map((item) => item.sentence);
+    }
+
+    function renderTranscriptResult(text) {
+      const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!cleaned) {
+        out.innerHTML = '<span class="error">No transcript text found yet.</span>';
+        return;
+      }
+
+      const summary = summarizeText(cleaned);
+      const highlights = extractHighlights(cleaned).map((line) => `• ${line}`).join('\n');
+      out.textContent = [
+        '=== Longer Script Summary ===',
+        summary,
+        '',
+        '=== Key Lines ===',
+        highlights || '• No highlights returned.',
+        '',
+        `=== Full Transcript (${cleaned.length} characters) ===`,
+        cleaned,
+      ].join('\n');
+    }
+
+    function updateTranscriptBox(text) {
+      const cleaned = String(text || '').trim();
+      if (!cleaned) return;
+      liveTranscript.value = `${liveTranscript.value}${liveTranscript.value.trim() ? ' ' : ''}${cleaned}`;
+      liveTranscript.scrollTop = liveTranscript.scrollHeight;
+    }
+
+    function summarizeTranscriptBox() {
+      renderTranscriptResult(liveTranscript.value);
+    }
+
+    function cleanTranscriptText(text) {
+      return String(text || '')
+        .replace(/\[(S|INAUDIBLE|MUSIC|APPLAUSE)\]/gi, '')
+        .replace(/\((the|un|or the other)\)/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
 
     async function runSummary() {
@@ -665,7 +771,7 @@
       }
 
       out.textContent = 'Executing transmission...';
-      const url = `/api/summarize?video=${encodeURIComponent(link)}&limit=6`;
+      const url = `/api/summarize?video=${encodeURIComponent(link)}&limit=${SUMMARY_SENTENCE_LIMIT}`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -679,8 +785,23 @@
         return;
       }
 
-      const highlights = (data.highlights || []).map((item) => `• ${item}`).join('\n');
-      out.textContent = `${data.summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${data.transcriptCharacters} characters`;
+      if (data.transcript) {
+        const cleaned = cleanTranscriptText(data.transcript);
+        liveTranscript.value = cleaned;
+        renderTranscriptResult(cleaned);
+        return;
+      }
+
+      const highlights = (data.highlights || []).slice(0, HIGHLIGHT_LIMIT).map((item) => `• ${item}`).join('\n');
+      out.textContent = [
+        '=== Longer Script Summary ===',
+        data.summary,
+        '',
+        '=== Key Lines ===',
+        highlights || '• No highlights returned.',
+        '',
+        `=== Transcript Length: ${data.transcriptCharacters} characters ===`,
+      ].join('\n');
     }
 
     function setListeningUi(active, text) {
@@ -702,7 +823,7 @@
         listenStatus.textContent = 'Loading free speech model. First run can take a while.';
         transcriberPromise = pipeline(
           'automatic-speech-recognition',
-          'Xenova/whisper-tiny.en',
+          'Xenova/whisper-base.en',
           { progress_callback: updateModelProgress }
         );
       }
@@ -728,33 +849,47 @@
       return output;
     }
 
-    async function decodeAudio(blob) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) {
-        throw new Error('This browser cannot decode captured audio.');
+    function collectBufferedAudio() {
+      if (!tabBufferedSamples) return null;
+
+      const samples = new Float32Array(tabBufferedSamples);
+      let offset = 0;
+      for (const buffer of tabBuffers) {
+        samples.set(buffer, offset);
+        offset += buffer.length;
       }
 
-      const context = new AudioContext();
-      const buffer = await context.decodeAudioData(await blob.arrayBuffer());
-      const samples = new Float32Array(buffer.length);
-
-      for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
-        const data = buffer.getChannelData(channel);
-        for (let i = 0; i < data.length; i += 1) {
-          samples[i] += data[i] / buffer.numberOfChannels;
-        }
-      }
-
-      await context.close();
-      return resampleAudio(samples, buffer.sampleRate, 16000);
+      tabBuffers = [];
+      tabBufferedSamples = 0;
+      return samples;
     }
 
-    async function transcribeAudioBlob(blob) {
-      if (!blob.size) {
+    function queueBufferedAudio(force = false) {
+      if (!tabBufferedSamples) return;
+      if (!force && tabBufferedSamples < tabSampleRate * CAPTURE_CHUNK_SECONDS) return;
+
+      const samples = collectBufferedAudio();
+      if (!samples?.length) return;
+
+      const chunkNumber = tabChunkNumber + 1;
+      tabChunkNumber = chunkNumber;
+      const sampleRate = tabSampleRate;
+      transcriptionQueue = transcriptionQueue
+        .then(() => transcribeAudioSamples(samples, sampleRate, chunkNumber))
+        .catch((error) => {
+          listenStatus.textContent = `Audio chunk ${chunkNumber} failed: ${error.message || error}`;
+        });
+    }
+
+    async function transcribeAudioSamples(samples, sampleRate, chunkNumber) {
+      if (!samples.length) {
         throw new Error('No audio was captured.');
       }
 
-      const audio = await decodeAudio(blob);
+      const seconds = Math.max(1, Math.round(samples.length / sampleRate));
+      setListeningUi(true, 'Transcribing');
+      listenStatus.textContent = `Transcribing audio chunk ${chunkNumber} (${seconds}s). Keep this page open.`;
+      const audio = resampleAudio(samples, sampleRate, 16000);
       const transcriber = await getTranscriber();
       const result = await transcriber(audio, {
         chunk_length_s: 30,
@@ -762,18 +897,23 @@
         task: 'transcribe',
         language: 'english',
       });
+      const text = cleanTranscriptText(result.text || '');
 
-      return result.text || '';
+      if (text) {
+        capturedSpeech = true;
+        finalizeCapturedText(text);
+      }
+
+      listenStatus.textContent = tabSharing
+        ? `Captured ${chunkNumber} audio chunk(s). Keep the video playing, then stop when done.`
+        : `Transcribed ${chunkNumber} audio chunk(s).`;
     }
 
     function finalizeCapturedText(text) {
-      const cleaned = String(text || '').trim();
+      const cleaned = cleanTranscriptText(text);
       if (!cleaned) return;
-      liveTranscript.value = `${liveTranscript.value}${liveTranscript.value.trim() ? ' ' : ''}${cleaned}`;
-      const summary = summarizeText(liveTranscript.value.trim());
-      const sentences = liveTranscript.value.trim().split(/(?<=[.!?])\s+/).filter(Boolean);
-      const highlights = sentences.slice(0, 5).map((line) => `• ${line}`).join('\n');
-      out.textContent = `${summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${liveTranscript.value.trim().length} characters`;
+      updateTranscriptBox(cleaned);
+      summarizeTranscriptBox();
     }
 
     function loadPlayer() {
@@ -795,87 +935,151 @@
       playerFrame.innerHTML = '<div class="player-placeholder">Load a YouTube link to play it here</div>';
     }
 
+    async function startTabAudioGraph(stream) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) {
+        throw new Error('This browser cannot process shared tab audio.');
+      }
+
+      tabAudioContext = new AudioContext();
+      tabSampleRate = tabAudioContext.sampleRate;
+      const audioStream = new MediaStream(stream.getAudioTracks());
+      tabSource = tabAudioContext.createMediaStreamSource(audioStream);
+      tabProcessor = tabAudioContext.createScriptProcessor(4096, 2, 1);
+      tabSilentGain = tabAudioContext.createGain();
+      tabSilentGain.gain.value = 0;
+
+      tabProcessor.onaudioprocess = (event) => {
+        if (!tabSharing) return;
+
+        const input = event.inputBuffer;
+        const channelCount = Math.max(1, input.numberOfChannels);
+        const mixed = new Float32Array(input.length);
+
+        for (let channel = 0; channel < channelCount; channel += 1) {
+          const channelData = input.getChannelData(channel);
+          for (let i = 0; i < channelData.length; i += 1) {
+            mixed[i] += channelData[i] / channelCount;
+          }
+        }
+
+        tabBuffers.push(mixed);
+        tabBufferedSamples += mixed.length;
+        queueBufferedAudio(false);
+      };
+
+      tabSource.connect(tabProcessor);
+      tabProcessor.connect(tabSilentGain);
+      tabSilentGain.connect(tabAudioContext.destination);
+      await tabAudioContext.resume();
+    }
+
+    async function cleanupTabAudio() {
+      try {
+        tabProcessor?.disconnect();
+        tabSource?.disconnect();
+        tabSilentGain?.disconnect();
+      } catch {
+        // The graph may already be disconnected when sharing ends from the browser UI.
+      }
+
+      if (tabAudioContext && tabAudioContext.state !== 'closed') {
+        await tabAudioContext.close().catch(() => {});
+      }
+
+      tabStream?.getTracks().forEach((track) => track.stop());
+      tabStream = null;
+      tabAudioContext = null;
+      tabSource = null;
+      tabProcessor = null;
+      tabSilentGain = null;
+      tabBuffers = [];
+      tabBufferedSamples = 0;
+    }
+
+    async function stopTabAudio() {
+      if (stoppingTabAudio || (!tabSharing && !tabStream)) return;
+
+      stoppingTabAudio = true;
+      tabSharing = false;
+      shareTabBtn.disabled = true;
+      shareTabBtn.textContent = 'Finishing...';
+      setListeningUi(true, 'Finishing');
+      listenStatus.textContent = 'Finishing remaining captured video audio...';
+      queueBufferedAudio(true);
+      await cleanupTabAudio();
+
+      try {
+        await transcriptionQueue;
+        listenStatus.textContent = capturedSpeech
+          ? 'Video audio transcription complete. Full transcript and longer summary are ready.'
+          : 'No clear speech was detected. Try sharing the YouTube tab and enabling tab audio.';
+      } catch (error) {
+        listenStatus.textContent = `Video audio transcription failed: ${error.message || error}`;
+      } finally {
+        shareTabBtn.disabled = false;
+        shareTabBtn.textContent = 'Record Video Audio';
+        setListeningUi(false, 'Idle');
+        tabChunkNumber = 0;
+        transcriptionQueue = Promise.resolve();
+        stoppingTabAudio = false;
+      }
+    }
+
     async function shareTabAudio() {
       if (!navigator.mediaDevices?.getDisplayMedia) {
         listenStatus.textContent = 'Tab audio capture is not supported in this browser.';
         return;
       }
 
-      if (typeof MediaRecorder === 'undefined') {
-        listenStatus.textContent = 'This browser cannot record shared tab audio.';
-        return;
-      }
-
       try {
         tabSharing = true;
+        stoppingTabAudio = false;
+        capturedSpeech = false;
+        tabBuffers = [];
+        tabBufferedSamples = 0;
+        tabChunkNumber = 0;
+        transcriptionQueue = Promise.resolve();
         shareTabBtn.textContent = 'Sharing...';
         setListeningUi(true, 'Sharing');
-        listenStatus.textContent = 'Pick the YouTube tab and enable audio sharing.';
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        listenStatus.textContent = 'Pick the YouTube tab or this tab, then enable audio sharing.';
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true,
+          preferCurrentTab: true,
+          selfBrowserSurface: 'include',
+          systemAudio: 'include',
+          surfaceSwitching: 'include',
+        });
         tabStream = stream;
 
         const audioTracks = stream.getAudioTracks();
         if (!audioTracks.length) {
-          throw new Error('No audio track was shared. Make sure tab audio is enabled.');
+          throw new Error('No audio track was shared. Turn on Share tab audio in the browser picker.');
         }
 
-        const audioStream = new MediaStream(audioTracks);
-        tabChunks = [];
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-        tabRecorder = new MediaRecorder(audioStream, { mimeType });
-
-        tabRecorder.ondataavailable = (event) => {
-          if (event.data && event.data.size > 0) {
-            tabChunks.push(event.data);
+        await startTabAudioGraph(stream);
+        const endCapture = () => {
+          if (tabSharing && !stoppingTabAudio) {
+            stopTabAudio();
           }
         };
+        tabStream.getTracks().forEach((track) => {
+          track.onended = endCapture;
+        });
 
-        tabRecorder.onstop = async () => {
-          try {
-            setListeningUi(true, 'Transcribing');
-            listenStatus.textContent = 'Transcribing captured video audio in your browser...';
-            const blob = new Blob(tabChunks, { type: mimeType });
-            const text = await transcribeAudioBlob(blob);
-            if (!text.trim()) {
-              throw new Error('No speech was detected in the captured video audio.');
-            }
-            finalizeCapturedText(text);
-            listenStatus.textContent = 'Video audio transcribed from the shared tab.';
-          } catch (error) {
-            listenStatus.textContent = `Video audio transcription failed: ${error.message || error}`;
-          } finally {
-            tabSharing = false;
-            shareTabBtn.textContent = 'Record Video Audio';
-            setListeningUi(false, 'Idle');
-            tabStream?.getTracks().forEach((track) => track.stop());
-            tabStream = null;
-            tabRecorder = null;
-            tabChunks = [];
-          }
-        };
-
-        tabRecorder.start();
         shareTabBtn.textContent = 'Stop Recording';
         setListeningUi(true, 'Recording');
-        listenStatus.textContent = 'Recording YouTube tab audio. Click Stop Recording when enough speech has played.';
-        tabStream.getVideoTracks().forEach((track) => {
-          track.onended = () => {
-            if (tabRecorder && tabRecorder.state !== 'inactive') {
-              tabRecorder.stop();
-            }
-          };
-        });
+        listenStatus.textContent = `Recording shared tab audio in ${CAPTURE_CHUNK_SECONDS}s chunks. Keep the video playing, then stop when done.`;
       } catch (error) {
         tabSharing = false;
+        stoppingTabAudio = false;
+        shareTabBtn.disabled = false;
         shareTabBtn.textContent = 'Record Video Audio';
         setListeningUi(false, 'Idle');
         listenStatus.textContent = error.message || 'Could not start tab audio capture.';
-        if (tabStream) {
-          tabStream.getTracks().forEach((track) => track.stop());
-          tabStream = null;
-        }
-        tabRecorder = null;
-        tabChunks = [];
+        await cleanupTabAudio();
+        transcriptionQueue = Promise.resolve();
       }
     }
 
@@ -887,14 +1091,11 @@
         return;
       }
 
-      const summary = summarizeText(text);
-      const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
-      const highlights = sentences.slice(0, 5).map((line) => `• ${line}`).join('\n');
-      out.textContent = `${summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${text.length} characters`;
+      summarizeTranscriptBox();
     });
     shareTabBtn.addEventListener('click', () => {
-      if (tabSharing && tabRecorder && tabRecorder.state !== 'inactive') {
-        tabRecorder.stop();
+      if (tabSharing || stoppingTabAudio) {
+        stopTabAudio();
       } else {
         shareTabAudio();
       }

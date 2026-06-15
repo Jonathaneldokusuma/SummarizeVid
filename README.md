@@ -1,6 +1,6 @@
 # SummarizeVid
 
-A Node.js CLI that pulls a YouTube transcript and turns it into a concise extractive summary.
+A YouTube summary app with a Vercel API route, terminal-style web UI, CLI entrypoint, and a free browser listener fallback for videos without captions.
 
 ## What it supports
 
@@ -11,8 +11,9 @@ A Node.js CLI that pulls a YouTube transcript and turns it into a concise extrac
 
 ## What it cannot do
 
-- Videos without an accessible transcript or captions
 - Private videos you do not have permission to access
+- Automatically capture video audio without the browser share prompt
+- Guarantee perfect speech recognition on noisy audio, heavy accents, or unclear speakers
 
 ## Install
 
@@ -35,14 +36,16 @@ node index.js "https://youtu.be/VIDEO_ID" --json
 
 ## Output
 
-- `Summary`: the most informative sentences from the transcript
-- `Key Lines`: a short list of high-signal transcript lines
+- `Summary`: a longer extractive brief for 1-20 minute videos
+- `Key Lines`: high-signal transcript lines
+- `Full Transcript`: the cleaned transcript returned from captions or browser audio capture
 - `Transcript Length`: size of the extracted transcript text
 
 ## Notes
 
 - English transcripts are preferred when available
-- If YouTube does not expose captions for a video, the tool will stop with a clear error
+- If YouTube does not expose captions for a video, use the web UI's shared tab audio listener
 - Free fallback: record shared tab audio and transcribe it in the browser, or paste transcript text manually
 - No paid transcription service or API key is required for the basic flow
-- The browser will download a free speech model the first time tab-audio transcription runs
+- The browser downloads a free Whisper model the first time tab-audio transcription runs
+- Tab audio capture uses the browser's screen/tab picker; select the YouTube tab or this tab and enable audio sharing

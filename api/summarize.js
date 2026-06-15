@@ -83,7 +83,7 @@ function summarizeText(text, maxSentences = 6) {
     .join(' ');
 }
 
-function extractHighlights(text, limit = 5) {
+function extractHighlights(text, limit = 12) {
   const sentences = splitSentences(text);
   const counts = [...tokenize(text)].reduce((acc, word) => acc.set(word, (acc.get(word) || 0) + 1), new Map());
 
@@ -168,15 +168,18 @@ module.exports = async (req, res) => {
       throw new Error('Transcript is empty.');
     }
 
-    const limit = Number(req.query.limit || req.body?.limit || 6);
-    const summary = summarizeText(transcript, Number.isFinite(limit) && limit > 0 ? limit : 6);
-    const highlights = extractHighlights(transcript, Math.min(Number.isFinite(limit) && limit > 0 ? limit : 6, 5));
+    const requestedLimit = Number(req.query.limit || req.body?.limit || 16);
+    const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 16;
+    const cleanTranscript = transcript.replace(/\s+/g, ' ').trim();
+    const summary = summarizeText(cleanTranscript, limit);
+    const highlights = extractHighlights(cleanTranscript, Math.min(limit, 12));
 
     res.status(200).json({
       video,
       summary,
       highlights,
-      transcriptCharacters: transcript.length,
+      transcript: cleanTranscript,
+      transcriptCharacters: cleanTranscript.length,
     });
   } catch (error) {
     const failure = formatTranscriptError(error, parseVideoId(req.query.video || req.body?.video) || 'that video');
