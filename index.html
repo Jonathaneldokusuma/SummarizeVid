@@ -525,7 +525,6 @@
                   <textarea id="liveTranscript" placeholder="Use the listener to capture speech from your microphone, then summarize the text here."></textarea>
                 </div>
                 <div class="actions" style="margin-top:16px">
-                  <button class="btn primary" id="tabListenBtn">Share Tab Audio</button>
                   <button class="btn primary" id="listenBtn">Start Listener</button>
                   <button class="btn" id="stopListenBtn">Stop Listener</button>
                   <button class="btn" id="summarizeTextBtn">Summarize Text</button>
@@ -613,15 +612,9 @@
     const listenStatus = document.getElementById('listenStatus');
     const listenChip = document.getElementById('listenChip');
     const listenChipText = document.getElementById('listenChipText');
-    const tabListenBtn = document.getElementById('tabListenBtn');
     let jsonMode = false;
     let recognition = null;
     let listening = false;
-    let tabStream = null;
-    let tabRecorder = null;
-    let tabChunks = [];
-    let tabListening = false;
-    let tabStopping = false;
 
     function parseVideoId(input) {
       if (!input) return null;
@@ -686,11 +679,6 @@
     function setListeningUi(active, text) {
       listenChip.classList.toggle('idle', !active);
       listenChipText.textContent = text;
-    }
-
-    function setTabListeningUi(active, text) {
-      tabListenBtn.textContent = text;
-      tabListenBtn.classList.toggle('primary', active);
     }
 
     function loadPlayer() {
@@ -788,145 +776,6 @@
       }
     }
 
-    async function transcribeAudioBlob(blob) {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
-        reader.onerror = () => reject(reader.error || new Error('Failed to read audio recording.'));
-        reader.readAsDataURL(blob);
-      });
-
-      const res = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audioBase64: base64,
-          mimeType: blob.type || 'audio/webm',
-          language: 'en',
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to transcribe audio.');
-      }
-      return data.text || '';
-    }
-
-    async function startTabAudioListener() {
-      if (!navigator.mediaDevices?.getDisplayMedia) {
-        listenStatus.textContent = 'Tab audio capture is not supported in this browser.';
-        return;
-      }
-
-      if (typeof MediaRecorder === 'undefined') {
-        listenStatus.textContent = 'This browser cannot record tab audio.';
-        return;
-      }
-
-      try {
-        tabStopping = false;
-        setTabListeningUi(true, 'Sharing');
-        listenStatus.textContent = 'Pick the YouTube tab and enable audio sharing.';
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        tabStream = stream;
-        const audioTracks = stream.getAudioTracks();
-        if (!audioTracks.length) {
-          stream.getTracks().forEach((track) => track.stop());
-          throw new Error('No audio track was shared. Make sure tab audio is enabled.');
-        }
-
-        const audioStream = new MediaStream(audioTracks);
-        tabChunks = [];
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : 'audio/webm';
-        tabRecorder = new MediaRecorder(audioStream, { mimeType });
-
-        tabRecorder.ondataavailable = (event) => {
-          if (event.data && event.data.size > 0) {
-            tabChunks.push(event.data);
-          }
-        };
-
-        tabRecorder.onstop = async () => {
-          if (tabStopping) {
-            return;
-          }
-          tabStopping = true;
-          try {
-            setTabListeningUi(false, 'Transcribing');
-            listenStatus.textContent = 'Transcribing shared tab audio...';
-            const blob = new Blob(tabChunks, { type: mimeType });
-            const text = await transcribeAudioBlob(blob);
-            if (!text.trim()) {
-              throw new Error('No speech was detected in the shared audio.');
-            }
-
-            appendTranscript(text);
-            const summary = summarizeText(liveTranscript.value.trim());
-            const sentences = liveTranscript.value.trim().split(/(?<=[.!?])\s+/).filter(Boolean);
-            const highlights = sentences.slice(0, 5).map((line) => `• ${line}`).join('\n');
-            out.textContent = `${summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${liveTranscript.value.trim().length} characters`;
-            listenStatus.textContent = 'Tab audio transcribed and appended to the listener transcript.';
-          } catch (error) {
-            listenStatus.textContent = `Tab audio transcription failed: ${error.message || error}`;
-          } finally {
-            setTabListeningUi(false, 'Share Tab Audio');
-            tabListening = false;
-            tabStream?.getTracks().forEach((track) => track.stop());
-            tabStream = null;
-            tabRecorder = null;
-            tabChunks = [];
-          }
-        };
-
-        tabRecorder.start();
-        tabListening = true;
-        setTabListeningUi(true, 'Recording');
-        listenStatus.textContent = 'Recording shared tab audio. Stop sharing when you want it transcribed.';
-        tabStream.getVideoTracks().forEach((track) => {
-          track.onended = () => {
-            if (tabRecorder && tabRecorder.state !== 'inactive') {
-              tabRecorder.stop();
-            }
-          };
-        });
-      } catch (error) {
-        tabListening = false;
-        setTabListeningUi(false, 'Share Tab Audio');
-        listenStatus.textContent = error.message || 'Could not start tab audio capture.';
-        if (tabStream) {
-          tabStream.getTracks().forEach((track) => track.stop());
-          tabStream = null;
-        }
-        tabRecorder = null;
-        tabChunks = [];
-      }
-    }
-
-    function stopTabAudioListener() {
-      if (tabStopping) {
-        return;
-      }
-      tabStopping = true;
-      if (tabRecorder && tabRecorder.state !== 'inactive') {
-        try {
-          tabRecorder.stop();
-        } catch {
-          // Ignore recorder shutdown races.
-        }
-      }
-      if (tabStream) {
-        tabStream.getTracks().forEach((track) => track.stop());
-      }
-      tabStream = null;
-      tabRecorder = null;
-      tabChunks = [];
-      tabListening = false;
-      setTabListeningUi(false, 'Share Tab Audio');
-      tabStopping = false;
-    }
-
     document.getElementById('summarizeBtn').addEventListener('click', runSummary);
     document.getElementById('summarizeTextBtn').addEventListener('click', () => {
       const text = liveTranscript.value.trim();
@@ -948,13 +797,6 @@
       }
     });
     document.getElementById('stopListenBtn').addEventListener('click', stopListener);
-    tabListenBtn.addEventListener('click', () => {
-      if (tabListening) {
-        stopTabAudioListener();
-      } else {
-        startTabAudioListener();
-      }
-    });
     document.getElementById('loadPlayerBtn').addEventListener('click', loadPlayer);
     document.getElementById('clearPlayerBtn').addEventListener('click', clearPlayer);
     let playerDebounce = null;
