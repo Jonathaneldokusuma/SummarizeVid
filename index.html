@@ -296,6 +296,43 @@
       font-size:13px;
       line-height:1.5;
     }
+    .live-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      margin-top:12px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(89,211,106,.25);
+      background:rgba(89,211,106,.08);
+      color:var(--good);
+      text-transform:uppercase;
+      letter-spacing:.16em;
+      font-size:11px;
+    }
+    .live-chip .dot{
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:var(--good);
+      box-shadow:0 0 0 0 rgba(89,211,106,.6);
+      animation:pulse 1.5s infinite;
+    }
+    .live-chip.idle{
+      border-color:#343434;
+      background:#181818;
+      color:#9a9a9a;
+    }
+    .live-chip.idle .dot{
+      background:#777;
+      animation:none;
+      box-shadow:none;
+    }
+    @keyframes pulse{
+      0%{box-shadow:0 0 0 0 rgba(89,211,106,.55)}
+      70%{box-shadow:0 0 0 10px rgba(89,211,106,0)}
+      100%{box-shadow:0 0 0 0 rgba(89,211,106,0)}
+    }
     .summary-box{
       min-height:240px;
       white-space:pre-wrap;
@@ -492,6 +529,7 @@
                   <button class="btn" id="stopListenBtn">Stop Listener</button>
                   <button class="btn" id="summarizeTextBtn">Summarize Text</button>
                 </div>
+                <div class="live-chip idle" id="listenChip"><span class="dot"></span><span id="listenChipText">Idle</span></div>
                 <div class="helper" id="listenStatus">Listener is idle. Chrome works best for live speech recognition.</div>
               </div>
             </div>
@@ -572,6 +610,8 @@
     const playerFrame = document.getElementById('playerFrame');
     const liveTranscript = document.getElementById('liveTranscript');
     const listenStatus = document.getElementById('listenStatus');
+    const listenChip = document.getElementById('listenChip');
+    const listenChipText = document.getElementById('listenChipText');
     let jsonMode = false;
     let recognition = null;
     let listening = false;
@@ -636,6 +676,11 @@
       out.textContent = `${data.summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${data.transcriptCharacters} characters`;
     }
 
+    function setListeningUi(active, text) {
+      listenChip.classList.toggle('idle', !active);
+      listenChipText.textContent = text;
+    }
+
     function loadPlayer() {
       const id = parseVideoId(video.value.trim());
       if (!id) {
@@ -681,7 +726,9 @@
       recognition.onstart = () => {
         listening = true;
         listenStatus.textContent = 'Listening... speak near the microphone while the video plays.';
+        setListeningUi(true, 'Listening');
         document.getElementById('listenBtn').textContent = 'Listening...';
+        liveTranscript.focus();
       };
 
       recognition.onresult = (event) => {
@@ -697,11 +744,13 @@
 
       recognition.onerror = (event) => {
         listenStatus.textContent = `Listener error: ${event.error}`;
+        setListeningUi(false, 'Idle');
       };
 
       recognition.onend = () => {
         listening = false;
         document.getElementById('listenBtn').textContent = 'Start Listener';
+        setListeningUi(false, 'Idle');
         if (listenStatus.textContent === 'Listening... speak near the microphone while the video plays.') {
           listenStatus.textContent = 'Listener stopped.';
         }
@@ -723,6 +772,14 @@
       listening = false;
       document.getElementById('listenBtn').textContent = 'Start Listener';
       listenStatus.textContent = 'Listener stopped.';
+      setListeningUi(false, 'Idle');
+      const text = liveTranscript.value.trim();
+      if (text) {
+        const summary = summarizeText(text);
+        const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+        const highlights = sentences.slice(0, 5).map((line) => `• ${line}`).join('\n');
+        out.textContent = `${summary}\n\nHighlights\n${highlights || '• No highlights returned.'}\n\nTranscript length: ${text.length} characters`;
+      }
     }
 
     document.getElementById('summarizeBtn').addEventListener('click', runSummary);
