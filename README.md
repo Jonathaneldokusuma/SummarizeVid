@@ -1,6 +1,6 @@
 # SummarizeVid
 
-A YouTube summary app with a Vercel API route, terminal-style web UI, CLI entrypoint, and a free browser listener fallback for videos without captions.
+A YouTube summary app with a Vercel API route, browser dashboard, command-line fallback, and a free browser listener for videos without captions.
 
 ## What it supports
 
@@ -41,6 +41,7 @@ node index.js "https://youtu.be/VIDEO_ID" --json
 - `Full Transcript`: the cleaned transcript returned from captions or browser audio capture
 - `Transcript Length`: size of the extracted transcript text
 - Common ASR cleanup: removes audio markers, fixes spacing, and normalizes a small glossary of frequent misheard terms
+- Clipboard actions: paste transcript text, copy the full summary output, select all output, and clear panels
 
 ## Notes
 

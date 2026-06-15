@@ -387,6 +387,29 @@
       background:#181818;
     }
     .chip.good{color:var(--good); border-color:rgba(89,211,106,.3)}
+    .module-list{
+      display:grid;
+      gap:12px;
+    }
+    .module-row{
+      display:grid;
+      grid-template-columns: minmax(140px,.45fr) 1fr;
+      gap:14px;
+      padding:13px 0;
+      border-bottom:1px solid #303030;
+    }
+    .module-row:last-child{border-bottom:0}
+    .module-name{
+      color:var(--accent);
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      font-size:11px;
+    }
+    .module-copy{
+      color:#d8d8d8;
+      line-height:1.55;
+    }
     .footer{
       margin-top:18px;
       border-radius:18px;
@@ -410,6 +433,7 @@
       .hero h1{font-size:48px}
       .shell{padding:12px}
       .section{padding:18px}
+      .module-row{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -526,7 +550,9 @@
                 </div>
                 <div class="actions" style="margin-top:16px">
                   <button class="btn primary" id="shareTabBtn">Record Video Audio</button>
+                  <button class="btn" id="pasteTranscriptBtn">Paste Text</button>
                   <button class="btn" id="summarizeTextBtn">Summarize Text</button>
+                  <button class="btn" id="clearTranscriptBtn">Clear Text</button>
                 </div>
                 <div class="live-chip idle" id="listenChip"><span class="dot"></span><span id="listenChipText">Idle</span></div>
                 <div class="helper" id="listenStatus">Use Record Video Audio for the YouTube tab sound. Select the tab and enable audio sharing. The first transcription downloads a larger free model for better accuracy.</div>
@@ -535,6 +561,11 @@
             <div class="output-card">
               <div class="field">
                 <label>Summary Output</label>
+              </div>
+              <div class="actions" style="margin:0 0 14px">
+                <button class="btn primary" id="copySummaryBtn">Copy Summary</button>
+                <button class="btn" id="selectSummaryBtn">Select Output</button>
+                <button class="btn" id="clearSummaryBtn">Clear Output</button>
               </div>
               <div id="out" class="summary-box">Waiting for an input link...</div>
             </div>
@@ -545,16 +576,27 @@
           <div class="section-head">
             <div>
               <h2 class="section-title">Active <span class="accent">Repositories</span></h2>
-              <p class="sub">The interface ships with a Vercel-ready API route, a CLI entrypoint, and a web shell built to feel like a control panel.</p>
+              <p class="sub">The project ships with a Vercel-ready API route, a browser dashboard, and a command-line fallback.</p>
             </div>
           </div>
           <div class="form-grid">
             <div class="form-card">
               <div class="field"><label>Core</label></div>
               <div class="summary-box" style="min-height:auto">
-                `api/summarize.js` handles transcript fetch + summary generation.<br>
-                `index.html` provides the terminal-style interface.<br>
-                `index.js` remains as the CLI entrypoint.
+                <div class="module-list">
+                  <div class="module-row">
+                    <div class="module-name">API Route</div>
+                    <div class="module-copy">api/summarize.js fetches YouTube captions, cleans the transcript, and builds the summary response.</div>
+                  </div>
+                  <div class="module-row">
+                    <div class="module-name">Web Shell</div>
+                    <div class="module-copy">index.html runs the browser dashboard, tab-audio listener, clipboard actions, and output panel.</div>
+                  </div>
+                  <div class="module-row">
+                    <div class="module-name">Command Line</div>
+                    <div class="module-copy">index.js stays available for quick command-line summaries and JSON output.</div>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="form-card">
@@ -616,6 +658,11 @@
     const listenChip = document.getElementById('listenChip');
     const listenChipText = document.getElementById('listenChipText');
     const shareTabBtn = document.getElementById('shareTabBtn');
+    const copySummaryBtn = document.getElementById('copySummaryBtn');
+    const selectSummaryBtn = document.getElementById('selectSummaryBtn');
+    const clearSummaryBtn = document.getElementById('clearSummaryBtn');
+    const pasteTranscriptBtn = document.getElementById('pasteTranscriptBtn');
+    const clearTranscriptBtn = document.getElementById('clearTranscriptBtn');
     let jsonMode = false;
     let tabStream = null;
     let tabAudioContext = null;
@@ -770,6 +817,76 @@
       const cleaned = cleanTranscriptText(liveTranscript.value);
       liveTranscript.value = cleaned;
       renderTranscriptResult(cleaned);
+    }
+
+    function flashButton(button, text, fallbackText = button.textContent) {
+      button.textContent = text;
+      window.setTimeout(() => {
+        button.textContent = fallbackText;
+      }, 1400);
+    }
+
+    function fallbackCopyText(text) {
+      const copyArea = document.createElement('textarea');
+      copyArea.value = text;
+      copyArea.setAttribute('readonly', '');
+      copyArea.style.position = 'fixed';
+      copyArea.style.left = '-9999px';
+      document.body.appendChild(copyArea);
+      copyArea.select();
+      const copied = document.execCommand('copy');
+      copyArea.remove();
+      return copied;
+    }
+
+    async function copySummaryOutput() {
+      const text = out.textContent.trim();
+      if (!text || text === 'Waiting for an input link...') {
+        flashButton(copySummaryBtn, 'Nothing To Copy', 'Copy Summary');
+        return;
+      }
+
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else if (!fallbackCopyText(text)) {
+          throw new Error('Clipboard copy is not available.');
+        }
+        flashButton(copySummaryBtn, 'Copied', 'Copy Summary');
+      } catch {
+        selectSummaryOutput();
+        flashButton(copySummaryBtn, 'Selected', 'Copy Summary');
+      }
+    }
+
+    function selectSummaryOutput() {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(out);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      flashButton(selectSummaryBtn, 'Selected', 'Select Output');
+    }
+
+    async function pasteTranscriptText() {
+      try {
+        if (!navigator.clipboard?.readText) {
+          throw new Error('Clipboard paste is not available in this browser.');
+        }
+
+        const text = await navigator.clipboard.readText();
+        if (!text.trim()) {
+          flashButton(pasteTranscriptBtn, 'Clipboard Empty', 'Paste Text');
+          return;
+        }
+
+        updateTranscriptBox(text);
+        summarizeTranscriptBox();
+        flashButton(pasteTranscriptBtn, 'Pasted', 'Paste Text');
+      } catch (error) {
+        listenStatus.textContent = `${error.message || 'Clipboard paste failed.'} You can still paste manually with Ctrl+V.`;
+        liveTranscript.focus();
+      }
     }
 
     function cleanTranscriptText(text) {
@@ -1124,6 +1241,19 @@
       }
 
       summarizeTranscriptBox();
+    });
+    pasteTranscriptBtn.addEventListener('click', pasteTranscriptText);
+    clearTranscriptBtn.addEventListener('click', () => {
+      liveTranscript.value = '';
+      listenStatus.textContent = 'Transcript box cleared. Paste text, record tab audio, or fetch captions again.';
+      flashButton(clearTranscriptBtn, 'Cleared', 'Clear Text');
+    });
+    copySummaryBtn.addEventListener('click', copySummaryOutput);
+    selectSummaryBtn.addEventListener('click', selectSummaryOutput);
+    clearSummaryBtn.addEventListener('click', () => {
+      out.textContent = 'Waiting for an input link...';
+      window.getSelection()?.removeAllRanges();
+      flashButton(clearSummaryBtn, 'Cleared', 'Clear Output');
     });
     shareTabBtn.addEventListener('click', () => {
       if (tabSharing || stoppingTabAudio) {
