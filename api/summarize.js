@@ -61,12 +61,34 @@ const TRANSCRIPT_FIXES = [
   [/\bAI\s+and\s+considering\s+through\s+the\s+years\b/gi, 'AI and machine learning through the years'],
 ];
 
+function removeRepetitionTail(text) {
+  let cleaned = String(text || '');
+  cleaned = cleaned.replace(/\$1(?:\.\d+){8,}\.?$/g, '');
+  cleaned = cleaned.replace(/(?:\b\d+(?:\.\d+)?\b[\s.,;:!?-]*){24,}$/g, '');
+
+  for (let size = 1; size <= 4; size += 1) {
+    const pattern = new RegExp(`(?:\\b([\\w'$-]+)\\b[\\s.,;:!?-]*){${size * 18},}$`, 'i');
+    const match = cleaned.match(pattern);
+    if (!match) continue;
+
+    const tail = match[0].trim();
+    const words = tail.toLowerCase().match(/\b[\w'$-]+\b/g) || [];
+    const uniqueWords = new Set(words);
+    if (words.length >= 18 && uniqueWords.size <= Math.max(2, size)) {
+      cleaned = cleaned.slice(0, match.index).trim();
+    }
+  }
+
+  return cleaned;
+}
+
 function cleanTranscriptText(text) {
-  let cleaned = String(text || '')
+  let cleaned = removeRepetitionTail(String(text || ''))
     .replace(/\[(S|INAUDIBLE|MUSIC|APPLAUSE|BLANK_AUDIO|SILENCE|NOISE)\]/gi, ' ')
     .replace(/&gt;&gt;|>>/g, ' ')
     .replace(/\((the|un|or the other)\)/gi, ' ')
     .replace(/\*+/g, ' ')
+    .replace(/\$1/g, '')
     .replace(/\s+([,.;:!?])/g, '$1')
     .replace(/([.!?]){2,}/g, '$1')
     .replace(/,\s*\./g, '.')
@@ -77,7 +99,7 @@ function cleanTranscriptText(text) {
     cleaned = cleaned.replace(pattern, replacement);
   }
 
-  return cleaned
+  return removeRepetitionTail(cleaned)
     .replace(/\s+([,.;:!?])/g, '$1')
     .replace(/([.!?]){2,}/g, '$1')
     .replace(/\s+/g, ' ')
