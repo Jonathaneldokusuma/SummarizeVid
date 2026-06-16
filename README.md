@@ -36,8 +36,8 @@ node index.js "https://youtu.be/VIDEO_ID" --json
 
 ## Output
 
-- `Summary`: a longer extractive brief for 1-20 minute videos
-- `Key Lines`: high-signal transcript lines
+- `Summary`: a longer extractive brief with up to 28 selected sentences
+- `Key Lines`: up to 18 high-signal transcript lines
 - `Full Transcript`: the cleaned transcript returned from captions or browser audio capture
 - `Transcript Length`: size of the extracted transcript text
 - Common ASR cleanup: removes audio markers, fixes spacing, and normalizes a small glossary of frequent misheard terms
@@ -49,6 +49,7 @@ node index.js "https://youtu.be/VIDEO_ID" --json
 - If YouTube does not expose captions for a video, use the web UI's shared tab audio listener
 - Free fallback: record shared tab audio and transcribe it in the browser, or paste transcript text manually
 - Listener mode writes transcript chunks first, then creates the summary after you stop recording
+- Long transcript mode keeps the full text in the transcript panel and summarizes after capture
 - No paid transcription service or API key is required for the basic flow
 - The browser downloads a free Whisper model the first time tab-audio transcription runs
 - Tab audio capture uses the browser's screen/tab picker; select the YouTube tab or this tab and enable audio sharing

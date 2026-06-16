@@ -297,6 +297,11 @@
       line-height:1.6;
       overflow-wrap:anywhere;
     }
+    #liveTranscript{
+      min-height:460px;
+      height:min(620px, 64vh);
+      overflow:auto;
+    }
     textarea:focus{
       border-color:rgba(245,200,66,.65);
       box-shadow:0 0 0 4px rgba(245,200,66,.12);
@@ -565,7 +570,7 @@
               <div class="form-card">
                 <div class="field">
                   <label for="liveTranscript">Live Listener Transcript</label>
-                  <textarea id="liveTranscript" placeholder="Record shared YouTube tab audio or paste transcript text here."></textarea>
+                  <textarea id="liveTranscript" spellcheck="false" placeholder="Record shared YouTube tab audio or paste a long transcript here."></textarea>
                 </div>
                 <div class="actions" style="margin-top:16px">
                   <button class="btn primary" id="shareTabBtn">Record Video Audio</button>
@@ -574,7 +579,7 @@
                   <button class="btn" id="clearTranscriptBtn">Clear Text</button>
                 </div>
                 <div class="live-chip idle" id="listenChip"><span class="dot"></span><span id="listenChipText">Idle</span></div>
-                <div class="helper" id="listenStatus">Use Record Video Audio for the YouTube tab sound. It writes the transcript first, then creates the summary after you stop.</div>
+                <div class="helper" id="listenStatus">Long transcript mode: it writes the transcript first, then creates a longer summary after you stop.</div>
               </div>
             </div>
             <div class="output-card">
@@ -697,8 +702,8 @@
     let tabSharing = false;
     let stoppingTabAudio = false;
     let transcriberPromise = null;
-    const SUMMARY_SENTENCE_LIMIT = 16;
-    const HIGHLIGHT_LIMIT = 12;
+    const SUMMARY_SENTENCE_LIMIT = 28;
+    const HIGHLIGHT_LIMIT = 18;
     const CAPTURE_CHUNK_SECONDS = 30;
     const STOP_WORDS = new Set([
       'the', 'and', 'for', 'that', 'with', 'this', 'from', 'have', 'are', 'was', 'were',
