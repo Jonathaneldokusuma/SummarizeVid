@@ -48,6 +48,7 @@ node index.js "https://youtu.be/VIDEO_ID" --json
 - English transcripts are preferred when available
 - If YouTube does not expose captions for a video, use the web UI's shared tab audio listener
 - Free fallback: record shared tab audio and transcribe it in the browser, or paste transcript text manually
+- Listener mode writes transcript chunks first, then creates the summary after you stop recording
 - No paid transcription service or API key is required for the basic flow
 - The browser downloads a free Whisper model the first time tab-audio transcription runs
 - Tab audio capture uses the browser's screen/tab picker; select the YouTube tab or this tab and enable audio sharing

@@ -574,7 +574,7 @@
                   <button class="btn" id="clearTranscriptBtn">Clear Text</button>
                 </div>
                 <div class="live-chip idle" id="listenChip"><span class="dot"></span><span id="listenChipText">Idle</span></div>
-                <div class="helper" id="listenStatus">Use Record Video Audio for the YouTube tab sound. Select the tab and enable audio sharing. The first transcription downloads a larger free model for better accuracy.</div>
+                <div class="helper" id="listenStatus">Use Record Video Audio for the YouTube tab sound. It writes the transcript first, then creates the summary after you stop.</div>
               </div>
             </div>
             <div class="output-card">
@@ -699,7 +699,7 @@
     let transcriberPromise = null;
     const SUMMARY_SENTENCE_LIMIT = 16;
     const HIGHLIGHT_LIMIT = 12;
-    const CAPTURE_CHUNK_SECONDS = 60;
+    const CAPTURE_CHUNK_SECONDS = 30;
     const STOP_WORDS = new Set([
       'the', 'and', 'for', 'that', 'with', 'this', 'from', 'have', 'are', 'was', 'were',
       'been', 'you', 'your', 'but', 'not', 'can', 'will', 'would', 'could', 'should',
@@ -1116,15 +1116,14 @@
       }
 
       listenStatus.textContent = tabSharing
-        ? `Captured ${chunkNumber} audio chunk(s). Keep the video playing, then stop when done.`
-        : `Transcribed ${chunkNumber} audio chunk(s).`;
+        ? `Wrote transcript chunk ${chunkNumber}. Keep the video playing; summary waits until Stop.`
+        : `Wrote transcript chunk ${chunkNumber}.`;
     }
 
     function finalizeCapturedText(text) {
       const cleaned = cleanTranscriptText(text);
       if (!cleaned) return;
       updateTranscriptBox(cleaned);
-      summarizeTranscriptBox();
     }
 
     function loadPlayer() {
@@ -1222,8 +1221,11 @@
 
       try {
         await transcriptionQueue;
+        if (capturedSpeech) {
+          summarizeTranscriptBox();
+        }
         listenStatus.textContent = capturedSpeech
-          ? 'Video audio transcription complete. Full transcript and longer summary are ready.'
+          ? 'Video audio transcription complete. Summary created after Stop.'
           : 'No clear speech was detected. Try sharing the YouTube tab and enabling tab audio.';
       } catch (error) {
         listenStatus.textContent = `Video audio transcription failed: ${error.message || error}`;
@@ -1254,6 +1256,13 @@
         shareTabBtn.textContent = 'Sharing...';
         setListeningUi(true, 'Sharing');
         listenStatus.textContent = 'Pick the YouTube tab or this tab, then enable audio sharing.';
+        out.textContent = [
+          '=== Transcript Capture Mode ===',
+          'Recording will write the full transcript into the transcript box first.',
+          'Summary will be generated only after you click Stop Recording.',
+          '',
+          `Transcript chunks are processed every ${CAPTURE_CHUNK_SECONDS} seconds for a better speed/accuracy balance.`,
+        ].join('\n');
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
           audio: true,
@@ -1281,7 +1290,7 @@
 
         shareTabBtn.textContent = 'Stop Recording';
         setListeningUi(true, 'Recording');
-        listenStatus.textContent = `Recording shared tab audio in ${CAPTURE_CHUNK_SECONDS}s chunks. Keep the video playing, then stop when done.`;
+        listenStatus.textContent = `Recording shared tab audio in ${CAPTURE_CHUNK_SECONDS}s chunks. Transcript writes first; summary happens after Stop.`;
       } catch (error) {
         tabSharing = false;
         stoppingTabAudio = false;
