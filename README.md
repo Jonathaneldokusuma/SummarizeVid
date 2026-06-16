@@ -34,6 +34,14 @@ node index.js "VIDEO_ID" --limit 8
 node index.js "https://youtu.be/VIDEO_ID" --json
 ```
 
+## Quality Check
+
+```bash
+npm run check
+```
+
+The GitHub Actions workflow runs the same check on pushes and pull requests.
+
 ## Output
 
 - `Summary`: a longer extractive brief with up to 28 selected sentences
