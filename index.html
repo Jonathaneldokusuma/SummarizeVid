@@ -723,6 +723,17 @@
       [/\bAI too may\b/gi, 'AI tools may'],
       [/\buser datai is\b/gi, 'user data. AI is'],
       [/\bAI\s+and\s+considering\s+through\s+the\s+years\b/gi, 'AI and machine learning through the years'],
+      [/\bI-moda\b/gi, 'AI model'],
+      [/\bAI-moda\b/gi, 'AI model'],
+      [/\btrain data\b/gi, 'training data'],
+      [/\bthe train data\b/gi, 'the training data'],
+      [/\bmassive of datasets\b/gi, 'massive datasets'],
+      [/\bIf you dok\b/gi, 'If your dog'],
+      [/\bIf your dog reach\b/gi, 'If your dog reaches'],
+      [/\breads the tread\b/gi, 'reaches the treat'],
+      [/\breach for the threat\b/gi, 'reach for the treat'],
+      [/\bfor the tree\b/gi, 'for the treat'],
+      [/\btrain a AI model\b/gi, 'train an AI model'],
     ];
 
     function parseVideoId(input) {
@@ -929,9 +940,19 @@
       return cleaned;
     }
 
+    function removeTranscriptNoise(text) {
+      return String(text || '')
+        .replace(/\[(S|SOUND|INAUDIBLE|MUSIC|APPLAUSE|BLANK_AUDIO|SILENCE|NOISE)\](?:\s*\[(S|SOUND|INAUDIBLE|MUSIC|APPLAUSE|BLANK_AUDIO|SILENCE|NOISE)\])+/gi, ' ')
+        .replace(/\[(S|SOUND|INAUDIBLE|MUSIC|APPLAUSE|BLANK_AUDIO|SILENCE|NOISE)\]/gi, ' ')
+        .replace(/\b([a-zA-Z])\1{14,}\b/g, ' ')
+        .replace(/\b([a-zA-Z]{1,4})(?:\s+\1){12,}\b/gi, ' ')
+        .replace(/\b(?:0\s*){8,}\b/g, ' ')
+        .replace(/\bminus\s+0(?:\s*\.?\s*0)+\b/gi, 'minus zero')
+        .replace(/\bplus\s+1\b/gi, 'plus one');
+    }
+
     function cleanTranscriptText(text) {
-      let cleaned = removeRepetitionTail(String(text || ''))
-        .replace(/\[(S|INAUDIBLE|MUSIC|APPLAUSE|BLANK_AUDIO|SILENCE|NOISE)\]/gi, ' ')
+      let cleaned = removeTranscriptNoise(removeRepetitionTail(String(text || '')))
         .replace(/&gt;&gt;|>>/g, ' ')
         .replace(/\((the|un|or the other)\)/gi, ' ')
         .replace(/\*+/g, ' ')
@@ -946,7 +967,7 @@
         cleaned = cleaned.replace(pattern, replacement);
       }
 
-      return removeRepetitionTail(cleaned)
+      return removeTranscriptNoise(removeRepetitionTail(cleaned))
         .replace(/\s+([,.;:!?])/g, '$1')
         .replace(/([.!?]){2,}/g, '$1')
         .replace(/\s+/g, ' ')
