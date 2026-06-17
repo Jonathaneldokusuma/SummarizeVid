@@ -42,6 +42,10 @@ npm run check
 
 The GitHub Actions workflow runs the same check on pushes and pull requests.
 
+## Troubleshooting
+
+Common listener, transcript, and deployment fixes are documented in `docs/TROUBLESHOOTING.md`.
+
 ## Output
 
 - `Summary`: a longer extractive brief with up to 28 selected sentences
