@@ -46,6 +46,10 @@ The GitHub Actions workflow runs the same check on pushes and pull requests.
 
 Common listener, transcript, and deployment fixes are documented in `docs/TROUBLESHOOTING.md`.
 
+## Architecture
+
+The app flow is documented in `docs/ARCHITECTURE.md`.
+
 ## Output
 
 - `Summary`: a longer extractive brief with up to 28 selected sentences
