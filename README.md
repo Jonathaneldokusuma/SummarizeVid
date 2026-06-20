@@ -50,6 +50,10 @@ Common listener, transcript, and deployment fixes are documented in `docs/TROUBL
 
 The app flow is documented in `docs/ARCHITECTURE.md`.
 
+## Security
+
+Privacy, secret handling, and vulnerability reporting guidance are documented in `SECURITY.md`.
+
 ## Output
 
 - `Summary`: a longer extractive brief with up to 28 selected sentences
