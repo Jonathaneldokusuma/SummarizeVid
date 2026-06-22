@@ -54,6 +54,10 @@ The app flow is documented in `docs/ARCHITECTURE.md`.
 
 Privacy, secret handling, and vulnerability reporting guidance are documented in `SECURITY.md`.
 
+## Releases
+
+The check, push, deploy, and verification flow is documented in `docs/RELEASE_CHECKLIST.md`.
+
 ## Output
 
 - `Summary`: a longer extractive brief with up to 28 selected sentences
